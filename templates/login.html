@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GINT Hive CBT - Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="nav-links">
+                <a href="{{ url_for('super_admin_login') }}" class="hive-link">🐝 Hive Admin</a>
+                <button id="theme-toggle" class="theme-toggle-icon">🌙</button>
+            </div>
+            <h1>GINT Hive CBT</h1>
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="admin">👨‍💼 Admin Login</button>
+                <button class="tab-btn" data-tab="student">👨‍🎓 Student Login</button>
+            </div>
+            <form id="admin-login-form" method="POST" action="{{ url_for('login') }}" class="login-form active">
+                <input type="hidden" name="role" value="admin">
+                <div class="input-group">
+                    <input type="text" name="username" placeholder="Admin Username" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn-primary">Login as Admin</button>
+            </form>
+            <form id="student-login-form" method="POST" action="{{ url_for('login') }}" class="login-form">
+                <input type="hidden" name="role" value="student">
+                <div class="input-group">
+                    <input type="text" name="username" placeholder="Student ID" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn-primary">Login as Student</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`${btn.dataset.tab}-login-form`).classList.add('active');
+            });
+        });
+        
+        // Theme toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            const isDark = document.body.classList.contains('dark-theme');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            themeToggle.textContent = isDark ? '☀️' : '🌙';
+        });
+        
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-theme');
+            themeToggle.textContent = '☀️';
+        }
+    </script>
+</body>
+</html>

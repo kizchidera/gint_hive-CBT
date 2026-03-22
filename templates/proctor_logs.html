@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proctor Logs - {{ exam.exam_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .violation-card { background: var(--bg-secondary); border-radius: 1rem; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border-light); transition: all 0.3s ease; }
+        .violation-card:hover { box-shadow: var(--shadow-md); }
+        .violation-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+        .violation-type { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 600; }
+        .violation-tab_switch { background: #f59e0b; color: white; }
+        .violation-fullscreen_exit { background: #ef4444; color: white; }
+        .violation-excessive_movement { background: #8b5cf6; color: white; }
+        .violation-face_away { background: #ec489a; color: white; }
+        .violation-window_blur { background: #6b7280; color: white; }
+        .violation-default { background: #3b82f6; color: white; }
+        .violation-time { color: var(--text-muted); font-size: 0.75rem; }
+        .student-info { background: var(--bg-tertiary); padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+        .violation-image { max-width: 300px; border-radius: 0.5rem; margin-top: 1rem; border: 1px solid var(--border-light); }
+        .violation-image img { width: 100%; border-radius: 0.5rem; }
+        .back-btn { margin-bottom: 1.5rem; display: inline-block; }
+        .stats-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--bg-tertiary); border-radius: 1rem; padding: 1rem; text-align: center; }
+        .stat-number { font-size: 1.5rem; font-weight: 700; color: var(--primary-500); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><span>📸</span><h2>Proctor Logs - {{ exam.exam_title }}</h2></div>
+        <div class="nav-actions"><button id="theme-toggle" class="theme-toggle">🌙</button><a href="{{ url_for('admin_dashboard') }}" class="logout-btn">← Back</a></div>
+    </nav>
+    <div class="dashboard-container">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn-secondary back-btn">← Back to Dashboard</a>
+        <div class="stats-summary">
+            <div class="stat-card"><div class="stat-number">{{ violations|length }}</div><div>Total Violations</div></div>
+            <div class="stat-card"><div class="stat-number">{{ violations|selectattr('violation_type', 'equalto', 'tab_switch')|list|length }}</div><div>Tab Switches</div></div>
+            <div class="stat-card"><div class="stat-number">{{ violations|selectattr('violation_type', 'equalto', 'fullscreen_exit')|list|length }}</div><div>Fullscreen Exits</div></div>
+            <div class="stat-card"><div class="stat-number">{{ violations|selectattr('violation_type', 'equalto', 'excessive_movement')|list|length }}</div><div>Excessive Movement</div></div>
+        </div>
+        {% if violations %}
+            {% for v in violations %}
+            <div class="violation-card">
+                <div class="violation-header">
+                    <span class="violation-type violation-{{ v.violation_type|default('default') }}">
+                        {% if v.violation_type == 'tab_switch' %}🔀 Tab Switch
+                        {% elif v.violation_type == 'fullscreen_exit' %}🖥️ Fullscreen Exit
+                        {% elif v.violation_type == 'excessive_movement' %}🏃 Excessive Movement
+                        {% elif v.violation_type == 'face_away' %}👤 Face Away
+                        {% elif v.violation_type == 'window_blur' %}🪟 Window Blur
+                        {% else %}⚠️ {{ v.violation_type }}{% endif %}
+                    </span>
+                    <span class="violation-time">📅 {{ v.created_at }}</span>
+                </div>
+                <div class="student-info"><strong>Student:</strong> {{ v.student_name }} ({{ v.student_id }})</div>
+                {% if v.image_data %}<div class="violation-image"><img src="{{ v.image_data }}" alt="Snapshot"><div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;">Snapshot captured</div></div>{% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="card" style="text-align:center;padding:3rem;"><div class="no-exams-icon">✅</div><h3>No Violations Recorded</h3><p>All students followed exam rules properly.</p></div>
+        {% endif %}
+    </div>
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('click', () => { document.body.classList.toggle('dark-theme'); localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light'); themeToggle.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙'; });
+        if(localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-theme'); themeToggle.textContent = '☀️'; }
+    </script>
+</body>
+</html>

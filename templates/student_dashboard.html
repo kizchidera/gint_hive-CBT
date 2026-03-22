@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - GINT Hive CBT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><span>🎓</span><h2>Welcome, {{ student_name }}!</h2></div>
+        <div class="nav-actions">
+            <span class="subscription-badge">Student</span>
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+            <a href="{{ url_for('logout') }}" class="logout-btn">🚪 Logout</a>
+        </div>
+    </nav>
+    
+    <div class="dashboard-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+        
+        <div class="welcome-card"><h1>Welcome, {{ student_name }}! 👋</h1><p>Ready to test your knowledge? Select an exam below to get started.</p></div>
+        
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-number" id="total-exams">0</div><div class="stat-label">Total Exams</div></div>
+            <div class="stat-card"><div class="stat-number" id="completed-exams">0</div><div class="stat-label">Completed</div></div>
+            <div class="stat-card"><div class="stat-number" id="available-exams">0</div><div class="stat-label">Available Now</div></div>
+        </div>
+        
+        <div class="card"><h3>📝 Your Exams</h3><div id="exams-container"><div class="loading-spinner"><div class="spinner"></div><p>Loading your exams...</p></div></div></div>
+        <div class="card"><h3>👤 Your Information</h3><div class="form-row"><div><strong>Student ID:</strong> {{ session.student_id }}</div><div><strong>Class:</strong> {{ session.student_class }}</div></div></div>
+    </div>
+    
+    <button class="refresh-btn" onclick="loadExams()" title="Refresh Exams">🔄</button>
+    
+    <script>
+        let examsData = [];
+        async function loadExams() {
+            const container = document.getElementById('exams-container');
+            container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Loading your exams...</p></div>';
+            try {
+                const response = await fetch('/get-student-exams');
+                const data = await response.json();
+                examsData = data.exams || [];
+                renderExams(examsData);
+                updateStats(examsData);
+            } catch(error) { container.innerHTML = '<div class="no-exams"><div class="no-exams-icon">⚠️</div><p>Error loading exams. Please try again.</p><button class="btn-start" onclick="loadExams()">Retry</button></div>'; }
+        }
+        
+        function renderExams(exams) {
+            const container = document.getElementById('exams-container');
+            if(!exams || exams.length === 0) { container.innerHTML = '<div class="no-exams"><div class="no-exams-icon">📭</div><h3>No Exams Available</h3><p>You don\'t have any exams assigned at the moment.</p></div>'; return; }
+            let html = '<div class="exam-grid">';
+            exams.forEach(exam => {
+                const isAvailable = exam.is_active === 1 && exam.status !== 'completed';
+                let statusClass = exam.status === 'completed' ? 'status-completed' : (exam.status === 'in_progress' ? 'status-in-progress' : (exam.is_active === 1 ? 'status-active' : 'status-inactive'));
+                let statusText = exam.status === 'completed' ? '✓ Completed' : (exam.status === 'in_progress' ? '⟳ In Progress' : (exam.is_active === 1 ? '● Available' : '○ Not Started'));
+                html += `<div class="exam-card ${isAvailable ? 'available' : 'disabled'}" onclick="${isAvailable ? `startExam('${exam.exam_code}')` : ''}">
+                    <div class="exam-status-badge ${statusClass}">${statusText}</div>
+                    <div class="exam-title">${escapeHtml(exam.exam_title)}</div>
+                    ${exam.subject_name ? `<div class="subject-badge">📚 ${escapeHtml(exam.subject_name)}</div>` : ''}
+                    <div class="exam-details">
+                        <div class="exam-detail-item"><strong>📋 Code:</strong> <code>${escapeHtml(exam.exam_code)}</code></div>
+                        <div class="exam-detail-item"><strong>📅 Date:</strong> ${exam.exam_date || 'To be announced'}</div>
+                        <div class="exam-detail-item"><strong>⏰ Time:</strong> ${exam.exam_time || 'To be announced'}</div>
+                        <div class="exam-detail-item"><strong>⏱️ Duration:</strong> ${exam.timer_minutes || 0} minutes</div>
+                        <div class="exam-detail-item"><strong>📝 Type:</strong> ${exam.exam_type === 'theory' ? '✍️ Theory' : (exam.exam_type === 'mixed' ? '📚 Mixed' : '🎯 Objective')}</div>
+                    </div>
+                    ${exam.instructions ? `<div class="instructions-text">📋 ${escapeHtml(exam.instructions)}</div>` : ''}
+                    <div class="exam-actions">
+                        ${isAvailable ? `<button class="btn-start" onclick="event.stopPropagation(); startExam('${exam.exam_code}')">▶ Start Exam</button>` : `<button class="btn-disabled" disabled>${exam.status === 'completed' ? '✓ Completed' : '⏸ Not Available'}</button>`}
+                        ${exam.status === 'completed' ? `<button class="btn-small download-btn" onclick="event.stopPropagation(); window.open('/download-student-responses/${exam.exam_code}', '_blank')">📥 Download My Responses</button>` : ''}
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function updateStats(exams) {
+            document.getElementById('total-exams').textContent = exams.length;
+            document.getElementById('completed-exams').textContent = exams.filter(e => e.status === 'completed').length;
+            document.getElementById('available-exams').textContent = exams.filter(e => e.is_active === 1 && e.status !== 'completed').length;
+        }
+        
+        function escapeHtml(text) { return text ? String(text).replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'); }) : ''; }
+        function startExam(examCode) { if(confirm('Are you ready to start the exam? The timer will begin immediately.')) window.location.href = `/take-exam/${examCode}`; }
+        
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('click', () => { document.body.classList.toggle('dark-theme'); localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light'); themeToggle.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙'; });
+        if(localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-theme'); themeToggle.textContent = '☀️'; }
+        
+        loadExams();
+        setInterval(loadExams, 30000);
+        setTimeout(() => { document.querySelectorAll('.alert').forEach(a => { a.style.opacity = '0'; setTimeout(() => a.remove(), 300); }); }, 5000);
+    </script>
+</body>
+</html>

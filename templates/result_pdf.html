@@ -1,0 +1,84 @@
+<!-- templates/result_pdf.html - Updated with Objective and Theory columns -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Exam Results - {{ exam_code }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            background: white;
+            color: #333;
+        }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; }
+        .school-name { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+        .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .results-table th { background: #0ea5e9; color: white; padding: 12px; text-align: left; }
+        .results-table td { padding: 10px; border-bottom: 1px solid #ddd; }
+        .score-columns { display: flex; justify-content: space-between; margin-top: 20px; }
+        .objective-score, .theory-score { flex: 1; text-align: center; padding: 10px; background: #f5f5f5; border-radius: 8px; margin: 0 10px; }
+        .total-score { text-align: right; margin-top: 20px; font-size: 18px; font-weight: bold; }
+        .correct { color: green; }
+        .incorrect { color: red; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="school-name">GINT Hive CBT</div>
+        <h2>Examination Results</h2>
+        <p>Exam Code: {{ exam_code }} | Class: {{ class_id }}</p>
+        <p>Date: {{ current_date }}</p>
+    </div>
+    
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>S/N</th>
+                <th>Student ID</th>
+                <th>Student Name</th>
+                <th>Objective Score</th>
+                <th>Theory Score</th>
+                <th>Total</th>
+                <th>Percentage</th>
+                <th>Grade</th>
+            </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ result.student_id }}</td>
+                <td>{{ result.name }}</td>
+                <td>{{ result.objective_score }}/{{ result.objective_total }}</td>
+                <td>{{ result.theory_score }}/{{ result.theory_total }}</td>
+                <td><strong>{{ result.total_score }}/{{ result.total_possible }}</strong></td>
+                <td>{{ "%.1f"|format(result.percentage) }}%</td>
+                <td>
+                    {% if result.percentage >= 70 %}A
+                    {% elif result.percentage >= 60 %}B
+                    {% elif result.percentage >= 50 %}C
+                    {% elif result.percentage >= 45 %}D
+                    {% else %}F
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="score-columns">
+        <div class="objective-score">
+            <strong>Objective Average</strong><br>
+            {{ objective_avg|default(0) }}%
+        </div>
+        <div class="theory-score">
+            <strong>Theory Average</strong><br>
+            {{ theory_avg|default(0) }}%
+        </div>
+    </div>
+    
+    <div class="total-score">
+        Class Average: {{ class_avg|default(0) }}%
+    </div>
+</body>
+</html>

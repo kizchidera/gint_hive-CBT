@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive Admin Dashboard - GINT Hive CBT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <span>🐝</span>
+            <h2>GINT Hive CBT - Super Admin Console</h2>
+        </div>
+        <div class="nav-actions">
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+            <a href="{{ url_for('login') }}" class="logout-btn">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{ schools|length }}</div>
+                <div class="stat-label">Total Schools</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ schools|selectattr('subscription_level', 'equalto', 'Pro')|list|length }}</div>
+                <div class="stat-label">Pro Schools</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ schools|selectattr('subscription_level', 'equalto', 'Basic')|list|length }}</div>
+                <div class="stat-label">Basic Schools</div>
+            </div>
+        </div>
+
+        <div class="create-school-section">
+            <h3>➕ Create New School</h3>
+            <form method="POST" action="{{ url_for('create_school') }}">
+                <div class="form-row">
+                    <input type="text" name="school_name" placeholder="School Name" required>
+                    <input type="text" name="school_id" placeholder="School ID (unique)" required>
+                </div>
+                <div class="form-row">
+                    <input type="text" name="admin_username" placeholder="Admin Username" required>
+                    <input type="password" name="admin_password" placeholder="Admin Password" required>
+                </div>
+                <div class="form-row">
+                    <select name="subscription_level">
+                        <option value="Basic">Basic Subscription</option>
+                        <option value="Pro">Pro Subscription</option>
+                    </select>
+                    <button type="submit" class="btn-primary">Create School</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>🏫 Managed Schools</h3>
+            <div style="overflow-x: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>School Name</th><th>School ID</th><th>Admin</th><th>Subscription</th><th>Valid Until</th><th>Actions</th></thead>
+                    <tbody>
+                        {% for school in schools %}
+                        <tr>
+                            <td><strong>{{ school.school_name }}</strong></td>
+                            <td>{{ school.school_id }}</td>
+                            <td>{{ school.admin_username }}</td>
+                            <td><span class="subscription-badge {{ school.subscription_level }}">{{ school.subscription_level }}</span></td>
+                            <td>{% if school.subscription_end %}{{ school.subscription_end }}{% else %}<span style="color: var(--text-muted);">Not set</span>{% endif %}</td>
+                            <td class="action-buttons">
+                                <button class="btn-small" onclick="showSubscriptionModal({{ school.id }}, '{{ school.subscription_level }}')">💰 Update Plan</button>
+                                <a href="{{ url_for('delete_school', school_id=school.id) }}" class="btn-small btn-danger" onclick="return confirm('Delete this school?')">🗑️ Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="subscriptionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('subscriptionModal')">&times;</span>
+            <h3>Update School Subscription</h3>
+            <form method="POST" id="subscriptionForm">
+                <div class="input-group"><label>Subscription Level</label><select name="subscription_level" id="sub_level"><option value="Basic">Basic</option><option value="Pro">Pro</option></select></div>
+                <div class="input-group"><label>Duration (days)</label><input type="number" name="duration_days" value="30" min="1" max="365" required></div>
+                <button type="submit" class="btn-primary">Update Subscription</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showSubscriptionModal(schoolId, currentLevel) {
+            document.getElementById('sub_level').value = currentLevel;
+            document.getElementById('subscriptionForm').action = "{{ url_for('update_subscription', school_id=0) }}".replace('0', schoolId);
+            document.getElementById('subscriptionModal').style.display = 'flex';
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        window.onclick = function(e) { if(e.target.classList.contains('modal')) e.target.style.display = 'none'; };
+        
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙';
+        });
+        if(localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-theme'); themeToggle.textContent = '☀️'; }
+    </script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Exam - {{ exam.exam_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body.exam-mode { overflow: hidden; background: var(--bg-primary); height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; }
+        body.exam-mode::-webkit-scrollbar { display: none; }
+        .camera-container { position: fixed; bottom: 20px; right: 20px; width: 200px; height: 150px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 2px solid var(--primary-500); z-index: 1000; background: #000; cursor: pointer; transition: all 0.3s ease; }
+        .camera-container:hover { transform: scale(1.05); }
+        .camera-container video { width: 100%; height: 100%; object-fit: cover; }
+        .camera-container .camera-label { position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+        .violation-warning { position: fixed; top: 20px; right: 20px; background: var(--danger); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: bold; z-index: 1001; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .exam-header { background: var(--bg-secondary); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); position: sticky; top: 0; z-index: 100; }
+        .timer { font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, var(--primary-500), var(--primary-600)); -webkit-background-clip: text; background-clip: text; color: transparent; font-feature-settings: "tnum"; }
+        .exam-container { padding: 2rem; max-width: 800px; margin: 0 auto; height: calc(100vh - 80px); overflow-y: auto; }
+        .question-panel { background: var(--bg-card); border-radius: 1.25rem; padding: 2rem; border: 1px solid var(--border-light); }
+        .progress-bar { height: 6px; background: var(--bg-tertiary); border-radius: 3px; margin-bottom: 2rem; overflow: hidden; }
+        #progress { height: 100%; background: linear-gradient(90deg, var(--primary-500), var(--primary-600)); border-radius: 3px; width: 0%; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .question-text { font-size: 1.25rem; font-weight: 500; margin-bottom: 1.5rem; color: var(--text-primary); line-height: 1.5; }
+        .options { display: flex; flex-direction: column; gap: 0.75rem; }
+        .option { display: flex; align-items: center; padding: 0.875rem; background: var(--bg-tertiary); border-radius: 0.75rem; cursor: pointer; transition: all var(--transition-fast) ease; border: 1px solid transparent; }
+        .option:hover { background: var(--primary-50); transform: translateX(6px); border-color: var(--primary-200); }
+        .option input { margin-right: 0.875rem; cursor: pointer; accent-color: var(--primary-500); }
+        .theory-question textarea { width: 100%; min-height: 150px; padding: 1rem; border: 2px solid var(--border-light); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); font-family: inherit; font-size: 0.875rem; resize: vertical; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 2rem; gap: 1rem; }
+        .nav-buttons button { padding: 0.75rem 1.5rem; background: var(--primary-500); color: white; border: none; border-radius: 0.75rem; cursor: pointer; font-weight: 600; transition: all var(--transition-fast) ease; }
+        .nav-buttons button:hover:not(:disabled) { background: var(--primary-600); transform: translateY(-2px); }
+        .nav-buttons button:disabled { background: var(--bg-tertiary); color: var(--text-muted); cursor: not-allowed; }
+        .answered-counter { text-align: center; margin-top: 1.25rem; font-size: 0.875rem; color: var(--text-muted); font-weight: 500; }
+        .violation-counter { position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; z-index: 1001; }
+        .fullscreen-prompt { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 10000; flex-direction: column; gap: 20px; text-align: center; padding: 20px; }
+        .fullscreen-prompt button { padding: 12px 30px; font-size: 18px; background: var(--primary-500); color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .countdown { font-size: 48px; font-weight: bold; color: var(--primary-500); margin-top: 20px; }
+    </style>
+</head>
+<body class="light-theme exam-mode">
+
+{% if exam and exam.is_active %}
+    <div id="fullscreen-prompt" class="fullscreen-prompt">
+        <h2>🔒 Enter Fullscreen Mode</h2>
+        <p>Press <strong>F11</strong> or click the button below to enter fullscreen.</p>
+        <button id="enter-fullscreen-btn">Enter Fullscreen Mode</button>
+        <div id="countdown" class="countdown">5</div>
+    </div>
+
+    <div class="exam-header">
+        <h2>{{ exam.exam_title }}</h2>
+        <div class="timer" id="timer">Loading...</div>
+    </div>
+    
+    <div id="camera-container" class="camera-container" style="display: none;"><video id="camera-video" autoplay muted playsinline></video><div class="camera-label">📷 Monitoring</div></div>
+    <div id="violation-counter" class="violation-counter" style="display: none;">⚠️ Violations: <span id="violation-count">0</span>/3</div>
+
+    <div class="exam-container" style="display: none;">
+        <div class="question-panel">
+            <div class="progress-bar"><div id="progress" style="width: 0%"></div></div>
+            <div id="question-area"></div>
+            <div class="nav-buttons">
+                <button id="prev-btn" disabled>← Previous</button>
+                <button id="next-btn">Next →</button>
+                <button id="submit-btn" style="display:none">✓ Submit Exam</button>
+            </div>
+            <div class="answered-counter">Answered: <span id="answered-count">0</span> / <span id="total-questions">{{ questions|length }}</span></div>
+        </div>
+    </div>
+
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <h3>📊 Exam Submitted</h3>
+            <p style="font-size: 1.5rem; margin: 1rem 0;">Your Score: <strong id="final-score"></strong> / <strong id="total-possible"></strong></p>
+            <p id="score-percentage"></p>
+            <button onclick="closeModalAndRedirect()" class="btn-primary">Return to Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = {{ questions|tojson }};
+        const examCode = "{{ exam.exam_code }}";
+        const timerMinutes = {{ exam.timer_minutes }};
+        const subscriptionLevel = "{{ subscription_level }}";
+        const isPro = subscriptionLevel === 'Pro';
+        const attemptId = {{ attempt_id }};
+        const examType = "{{ exam.exam_type }}";
+        
+        let currentIndex = 0, answers = {}, theoryAnswers = {}, timerInterval, stream = null, violationCount = 0, lastFrame = null, motionInterval = null, fullscreenExitCount = 0, examStarted = false, countdownInterval;
+        
+        const fullscreenPrompt = document.getElementById('fullscreen-prompt');
+        const examContainer = document.querySelector('.exam-container');
+        const cameraContainer = document.getElementById('camera-container');
+        const cameraVideo = document.getElementById('camera-video');
+        const violationCounter = document.getElementById('violation-counter');
+        
+        function enterFullscreen() { const e = document.documentElement; e.requestFullscreen?.() || e.webkitRequestFullscreen?.() || e.msRequestFullscreen?.(); }
+        function isFullscreen() { return document.fullscreenElement || document.webkitFullscreenElement; }
+        
+        function startCountdown() {
+            let count = 5;
+            const countdownEl = document.getElementById('countdown');
+            countdownInterval = setInterval(() => { count--; countdownEl.textContent = count; if(count <= 0) { clearInterval(countdownInterval); if(!isFullscreen()) enterFullscreen(); } }, 1000);
+        }
+        
+        function startExam() {
+            if(examStarted) return;
+            examStarted = true;
+            fullscreenPrompt.style.display = 'none';
+            examContainer.style.display = 'block';
+            initCamera();
+            renderQuestion();
+            startTimer(timerMinutes);
+            setTimeout(() => { if(isPro) { cameraContainer.style.display = 'block'; violationCounter.style.display = 'block'; } }, 500);
+        }
+        
+        document.addEventListener('fullscreenchange', () => {
+            if(isFullscreen() && !examStarted) startExam();
+            else if(!isFullscreen() && examStarted) {
+                fullscreenExitCount++;
+                addViolation('fullscreen_exit');
+                if(fullscreenExitCount >= 1) { showWarning('⚠️ You exited fullscreen! Exam will be submitted.'); setTimeout(() => submitExam(), 2000); }
+                else { showWarning('⚠️ Please stay in fullscreen mode!'); setTimeout(() => enterFullscreen(), 500); }
+            }
+        });
+        
+        document.addEventListener('visibilitychange', () => { if(document.hidden && examStarted) addViolation('tab_switch'); });
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'F11') { e.preventDefault(); if(!isFullscreen() && !examStarted) enterFullscreen(); else addViolation('keyboard_shortcut'); return false; }
+            if(examStarted && ((e.ctrlKey && ['c','v','x','p','s'].includes(e.key)) || e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'Tab') || (e.altKey && e.key === 'Tab'))) {
+                e.preventDefault(); addViolation('keyboard_shortcut'); showWarning('⚠️ Keyboard shortcuts are disabled!'); return false;
+            }
+        });
+        document.addEventListener('contextmenu', (e) => { if(examStarted) { e.preventDefault(); addViolation('right_click'); return false; } });
+        document.addEventListener('copy', (e) => { if(examStarted) { e.preventDefault(); addViolation('copy_attempt'); return false; } });
+        document.addEventListener('paste', (e) => { if(examStarted) { e.preventDefault(); addViolation('paste_attempt'); return false; } });
+        
+        async function addViolation(type) {
+            violationCount++; document.getElementById('violation-count').textContent = violationCount;
+            let img = null;
+            if(stream && cameraVideo.videoWidth) {
+                const canvas = document.createElement('canvas');
+                canvas.width = cameraVideo.videoWidth; canvas.height = cameraVideo.videoHeight;
+                canvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+                img = canvas.toDataURL('image/jpeg', 0.5);
+            }
+            await fetch('/proctor-violation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exam_code: examCode, violation: type, image: img }) });
+            if(violationCount >= 3) { showWarning('⚠️ 3 violations! Auto-submitting...'); setTimeout(() => submitExam(), 2000); }
+        }
+        
+        function showWarning(msg) { const w = document.createElement('div'); w.className = 'violation-warning'; w.innerHTML = msg; document.body.appendChild(w); setTimeout(() => w.remove(), 3000); }
+        
+        async function initCamera() {
+            if(!isPro) return;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+                cameraVideo.srcObject = stream;
+                startMotionDetection();
+            } catch(e) { addViolation('camera_unavailable'); showWarning('⚠️ Camera not available!'); }
+        }
+        
+        function startMotionDetection() {
+            const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+            motionInterval = setInterval(() => {
+                if(cameraVideo.videoWidth && cameraVideo.videoHeight) {
+                    canvas.width = cameraVideo.videoWidth; canvas.height = cameraVideo.videoHeight;
+                    ctx.drawImage(cameraVideo, 0, 0);
+                    const current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    if(lastFrame) {
+                        let changed = 0, total = 0;
+                        for(let i = 0; i < current.data.length; i += 200) {
+                            const diff = Math.abs(current.data[i] - lastFrame.data[i]) + Math.abs(current.data[i+1] - lastFrame.data[i+1]) + Math.abs(current.data[i+2] - lastFrame.data[i+2]);
+                            if(diff > 80) changed++;
+                            total++;
+                        }
+                        if(changed / total > 0.3) addViolation('excessive_movement');
+                    }
+                    lastFrame = current;
+                }
+            }, 3000);
+        }
+        
+        function renderQuestion() {
+            const q = questions[currentIndex], area = document.getElementById('question-area');
+            const isTheory = examType === 'theory' || (!q.option1 && !q.option2 && !q.option3 && !q.option4);
+            if(isTheory) {
+                area.innerHTML = `<div class="question-text">${q.serial_no}. ${escapeHtml(q.question)}</div><div class="theory-question"><textarea id="theory-answer" placeholder="Type your answer here...">${theoryAnswers[q.id] || ''}</textarea><div id="word-count" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">Words: ${(theoryAnswers[q.id] || '').split(/\s+/).filter(w=>w.length).length}</div></div>`;
+                document.getElementById('theory-answer').addEventListener('input', (e) => { theoryAnswers[q.id] = e.target.value; updateProgress(); });
+            } else {
+                area.innerHTML = `<div class="question-text">${q.serial_no}. ${escapeHtml(q.question)}</div><div class="options">
+                    <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option1)}" ${answers[q.id] === q.option1 ? 'checked' : ''}> A. ${escapeHtml(q.option1)}</label>
+                    <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option2)}" ${answers[q.id] === q.option2 ? 'checked' : ''}> B. ${escapeHtml(q.option2)}</label>
+                    <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option3)}" ${answers[q.id] === q.option3 ? 'checked' : ''}> C. ${escapeHtml(q.option3)}</label>
+                    <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option4)}" ${answers[q.id] === q.option4 ? 'checked' : ''}> D. ${escapeHtml(q.option4)}</label>
+                </div>`;
+                document.querySelectorAll('input[name="answer"]').forEach(r => r.addEventListener('change', (e) => { answers[q.id] = e.target.value; updateProgress(); }));
+            }
+            document.getElementById('prev-btn').disabled = currentIndex === 0;
+            document.getElementById('next-btn').style.display = currentIndex === questions.length-1 ? 'none' : 'inline-block';
+            document.getElementById('submit-btn').style.display = currentIndex === questions.length-1 ? 'inline-block' : 'none';
+        }
+        
+        function updateProgress() { const a = Object.keys(answers).length + Object.keys(theoryAnswers).length; document.getElementById('answered-count').textContent = a; document.getElementById('progress').style.width = `${(a/questions.length)*100}%`; }
+        function escapeHtml(t) { return t ? String(t).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])) : ''; }
+        
+        function startTimer(m) {
+            let t = m * 60;
+            timerInterval = setInterval(() => { const mins = Math.floor(t/60), secs = t%60; document.getElementById('timer').textContent = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`; if(t <= 0) { clearInterval(timerInterval); submitExam(); } t--; }, 1000);
+        }
+        
+        async function submitExam() {
+            clearInterval(timerInterval); if(motionInterval) clearInterval(motionInterval); if(countdownInterval) clearInterval(countdownInterval);
+            if(stream) stream.getTracks().forEach(t => t.stop());
+            if(document.exitFullscreen) document.exitFullscreen();
+            const btn = document.getElementById('submit-btn'); if(btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+            try {
+                const res = await fetch('/submit-exam', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exam_code: examCode, answers, theory_answers: theoryAnswers, attempt_id: attemptId }) });
+                const data = await res.json();
+                document.getElementById('final-score').textContent = data.score;
+                document.getElementById('total-possible').textContent = data.total;
+                const pct = (data.score/data.total*100).toFixed(1);
+                document.getElementById('score-percentage').innerHTML = `<strong>${pct}%</strong> - ${pct>=70 ? 'Excellent!' : (pct>=50 ? 'Good!' : 'Needs Improvement')}`;
+                document.getElementById('result-modal').style.display = 'flex';
+            } catch(e) { alert('Error submitting exam. Please try again.'); }
+        }
+        
+        function closeModalAndRedirect() { window.location.href = '/student-dashboard'; }
+        
+        document.getElementById('prev-btn').addEventListener('click', () => { if(currentIndex > 0) { currentIndex--; renderQuestion(); } });
+        document.getElementById('next-btn').addEventListener('click', () => { if(currentIndex < questions.length-1) { currentIndex++; renderQuestion(); } });
+        document.getElementById('submit-btn').addEventListener('click', () => { if(confirm('Submit your exam?')) submitExam(); });
+        document.getElementById('enter-fullscreen-btn').addEventListener('click', () => enterFullscreen());
+        
+        startCountdown();
+        if(isFullscreen()) startExam();
+        
+        setInterval(() => { if(examStarted && (Object.keys(answers).length || Object.keys(theoryAnswers).length)) localStorage.setItem(`exam_${examCode}_progress`, JSON.stringify({ answers, theoryAnswers, timestamp: new Date() })); }, 30000);
+        window.addEventListener('beforeunload', (e) => { if(examStarted && Object.keys(answers).length + Object.keys(theoryAnswers).length < questions.length) { e.preventDefault(); e.returnValue = 'You have not completed the exam.'; } });
+        window.addEventListener('blur', () => { if(examStarted) addViolation('window_blur'); });
+    </script>
+{% else %}
+    <div class="exam-container"><div class="card" style="text-align:center;padding:3rem;"><div class="no-exams-icon">⏸️</div><h3>Exam Not Available</h3><a href="{{ url_for('student_dashboard') }}" class="btn-primary">Return to Dashboard</a></div></div>
+{% endif %}
+</body>
+</html>

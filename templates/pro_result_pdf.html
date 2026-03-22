@@ -1,0 +1,284 @@
+<!-- templates/pro_result_pdf.html - Fixed -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Transcript - {{ student.name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            background: white;
+            color: #1f2937;
+        }
+        .school-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #3b82f6;
+        }
+        .school-logo {
+            max-width: 100px;
+            max-height: 100px;
+            margin-bottom: 15px;
+        }
+        .school-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3b82f6;
+            margin-bottom: 5px;
+        }
+        .school-address {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .document-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .student-info {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .student-info p {
+            margin: 5px 0;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .results-table th {
+            background: #3b82f6;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .results-table tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        .grade-A {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .grade-B {
+            color: #3b82f6;
+            font-weight: bold;
+        }
+        .grade-C {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        .grade-D {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .grade-F {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .signature-line {
+            text-align: center;
+            width: 200px;
+        }
+        .signature-name {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .signature-title {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .remarks {
+            margin-top: 30px;
+            padding: 15px;
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            border-radius: 4px;
+        }
+        .summary-stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f3f4f6;
+            border-radius: 8px;
+        }
+        .print-date {
+            text-align: right;
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+        @media print {
+            body {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-date">
+        Generated: {{ current_date }}
+    </div>
+    
+    <div class="school-header">
+        {% if settings and settings.get('logo') %}
+        <img src="{{ settings.logo }}" alt="School Logo" class="school-logo">
+        {% endif %}
+        <div class="school-name">
+            {{ settings.school_name if settings and settings.get('school_name') else 'GINT Hive CBT School' }}
+        </div>
+        <div class="school-address">
+            {{ settings.address if settings and settings.get('address') else 'Education Excellence Center, Learning City' }}
+        </div>
+    </div>
+    
+    <div class="document-title">
+        Academic Transcript
+    </div>
+    
+    <div class="student-info">
+        <p><span class="info-label">Student Name:</span> {{ student.name }}</p>
+        <p><span class="info-label">Student ID:</span> {{ student.student_id }}</p>
+        <p><span class="info-label">Class:</span> {{ student.class_id }}</p>
+        <p><span class="info-label">Session:</span> {{ student.session }}</p>
+    </div>
+    
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>S/N</th>
+                <th>Exam Title</th>
+                <th>Exam Code</th>
+                <th>Score</th>
+                <th>Total</th>
+                <th>Percentage</th>
+                <th>Grade</th>
+            </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ result.exam_title }}</td>
+                <td>{{ result.exam_code }}</td>
+                <td>{{ result.score }}</td>
+                <td>{{ result.total_possible }}</td>
+                {% set percentage = (result.score / result.total_possible * 100) if result.total_possible > 0 else 0 %}
+                <td>{{ "%.1f"|format(percentage) }}%</td>
+                <td>
+                    {% if percentage >= 70 %}
+                        <span class="grade-A">A (Excellent)</span>
+                    {% elif percentage >= 60 %}
+                        <span class="grade-B">B (Very Good)</span>
+                    {% elif percentage >= 50 %}
+                        <span class="grade-C">C (Good)</span>
+                    {% elif percentage >= 45 %}
+                        <span class="grade-D">D (Pass)</span>
+                    {% else %}
+                        <span class="grade-F">F (Fail)</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center;">No examination records found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if results %}
+    <div class="summary-stats">
+        <h4>Academic Summary</h4>
+        {% set scores = results|map(attribute='score')|list %}
+        {% set totals = results|map(attribute='total_possible')|list %}
+        {% set percentages = [] %}
+        {% for i in range(results|length) %}
+            {% set p = (scores[i] / totals[i] * 100) if totals[i] > 0 else 0 %}
+        {% endfor %}
+        {% if percentages %}
+        <p><strong>Average Score:</strong> {{ "%.1f"|format(percentages|sum / percentages|length) }}%</p>
+        <p><strong>Highest Score:</strong> {{ "%.1f"|format(percentages|max) }}%</p>
+        <p><strong>Lowest Score:</strong> {{ "%.1f"|format(percentages|min) }}%</p>
+        <p><strong>Total Exams Taken:</strong> {{ results|length }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="remarks">
+        <strong>📝 Principal's Remarks:</strong><br>
+        {% set avg = percentages|sum / percentages|length if percentages else 0 %}
+        {% if avg >= 70 %}
+        Excellent performance! The student has shown outstanding academic excellence and is highly recommended for further studies.
+        {% elif avg >= 60 %}
+        Very good performance. The student has demonstrated strong understanding of the curriculum.
+        {% elif avg >= 50 %}
+        Good performance. The student has satisfactorily completed the requirements with room for improvement.
+        {% elif avg >= 45 %}
+        Fair performance. The student needs to put in more effort to achieve better results.
+        {% else %}
+        Needs improvement. The student requires additional support and dedication to academic work.
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="signature-section">
+        <div class="signature-line">
+            <div>_________________________</div>
+            <div class="signature-name">{{ settings.principal_name if settings and settings.get('principal_name') else 'School Principal' }}</div>
+            <div class="signature-title">Principal</div>
+        </div>
+        <div class="signature-line">
+            <div>_________________________</div>
+            <div class="signature-name">{{ settings.registrar_name if settings and settings.get('registrar_name') else 'Academic Registrar' }}</div>
+            <div class="signature-title">Registrar</div>
+        </div>
+        <div class="signature-line">
+            <div>_________________________</div>
+            <div class="signature-name">Student's Signature</div>
+            <div class="signature-title">Student</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>This is an official academic transcript issued by GINT Hive CBT.</p>
+        <p>For verification, please contact the school administration.</p>
+        <p>© {{ current_year }} GINT Hive CBT - All Rights Reserved</p>
+    </div>
+</body>
+</html>
