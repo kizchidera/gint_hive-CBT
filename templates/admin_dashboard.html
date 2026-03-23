@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - GINT Hive CBT</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         .stats-summary {
@@ -18,18 +19,24 @@
             border-radius: 1rem;
             padding: 1rem;
             text-align: center;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .stat-mini:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
         }
         
         .stat-mini-value {
-            font-size: 1.5rem;
+            font-size: 1.75rem;
             font-weight: 700;
             color: var(--primary-500);
         }
         
         .exam-type-badge {
             display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.375rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
             font-size: 0.7rem;
             font-weight: 600;
         }
@@ -47,8 +54,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
+            margin-top: 0.25rem;
         }
         
         .template-buttons {
@@ -56,6 +64,7 @@
             gap: 0.75rem;
             flex-wrap: wrap;
             align-items: center;
+            margin-bottom: 1rem;
         }
         
         .btn-template {
@@ -81,8 +90,104 @@
             transform: translateY(-2px);
         }
         
-        .btn-template.objective:hover { background: var(--info); }
-        .btn-template.theory:hover { background: var(--warning); }
+        .class-filter {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 0.75rem;
+        }
+        
+        .class-filter label {
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        .class-filter select {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-light);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        
+        .download-pdf-btn {
+            background: var(--primary-500);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            cursor: pointer;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .download-pdf-btn:hover {
+            background: var(--primary-600);
+            transform: translateY(-2px);
+        }
+        
+        .student-table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 0.75rem;
+        }
+        
+        .subject-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--primary-50);
+            color: var(--primary-600);
+            border-radius: 2rem;
+            font-size: 0.7rem;
+            margin-top: 0.5rem;
+        }
+        
+        .dark-theme .subject-badge {
+            background: rgba(249, 115, 22, 0.2);
+            color: var(--primary-400);
+        }
+        
+        .exam-code {
+            font-family: monospace;
+            font-size: 0.8rem;
+            background: var(--bg-tertiary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            background: var(--bg-card);
+            border-radius: 1rem;
+            border: 1px solid var(--border-light);
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.6;
+        }
+        
+        .empty-state h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        .empty-state p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
         
         .proctor-link {
             background: #8b5cf6;
@@ -101,13 +206,37 @@
         .download-responses-btn:hover {
             background: #059669;
         }
+        
+        .edit-student-icon {
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            background: var(--primary-50);
+            color: var(--primary-600);
+            transition: all var(--transition-fast) ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+        }
+        
+        .edit-student-icon:hover {
+            background: var(--primary-500);
+            color: white;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="navbar-brand">
+            {% if settings and settings.get('logo') %}
+            <img src="{{ settings.logo }}" alt="School Logo" class="navbar-logo" onerror="this.style.display='none'">
+            {% else %}
             <span>📚</span>
-            <h2>GINT Hive CBT - {{ session.school_name }}</h2>
+            {% endif %}
+            <h2>{{ settings.school_name if settings and settings.get('school_name') else session.school_name }} - CBT Portal</h2>
         </div>
         <div class="nav-actions">
             <span class="subscription-badge {{ subscription }}">{{ subscription }}</span>
@@ -160,15 +289,11 @@
                             <a href="{{ url_for('download_subject_template') }}" class="btn-secondary">📥 Download Template</a>
                         {% endif %}
                     </div>
+                    {% if subjects %}
                     <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
                         <table class="data-table">
                             <thead>
-                                <tr>
-                                    <th>Subject Code</th>
-                                    <th>Subject Name</th>
-                                    <th>Description</th>
-                                    <th>Actions</th>
-                                </thead>
+                                <tr><th>Subject Code</th><th>Subject Name</th><th>Description</th><th>Actions</th></thead>
                             <tbody>
                                 {% for subject in subjects %}
                                 <tr>
@@ -186,10 +311,17 @@
                             </tbody>
                         </table>
                     </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📚</div>
+                        <h4>No Subjects Yet</h4>
+                        <p>Create your first subject using the button above.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             
-            <!-- Students Section -->
+            <!-- Students Section with Class Filter -->
             <div class="collapsible-section">
                 <div class="collapsible-header" onclick="toggleCollapsible(this)">
                     <h3><span>👥</span> Students Management</h3>
@@ -203,22 +335,37 @@
                             <a href="{{ url_for('download_csv_template', type='students') }}" class="btn-secondary">📥 Download Template</a>
                         {% endif %}
                     </div>
-                    <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
-                        <table class="data-table">
+                    
+                    <!-- Class Filter and Download -->
+                    <div class="class-filter">
+                        <label>📋 Filter by Class:</label>
+                        <select id="classFilter" onchange="filterStudentsByClass()">
+                            <option value="all">All Classes</option>
+                            {% for class in classes %}
+                            <option value="{{ class.class_id }}">{{ class.class_id }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="download-pdf-btn" onclick="downloadStudentsPDF()">📄 Download Students List (PDF)</button>
+                    </div>
+                    
+                    {% if students %}
+                    <div class="student-table-container">
+                        <table class="data-table" id="studentsTable">
                             <thead>
                                 <tr><th>ID</th><th>Name</th><th>Class</th><th>Session</th><th>Actions</th></tr>
                             </thead>
-                            <tbody>
+                            <tbody id="studentsTableBody">
                                 {% for student in students %}
-                                <tr>
+                                <tr data-class="{{ student.class_id }}">
                                     <td><code>{{ student.student_id }}</code></td>
                                     <td><strong>{{ student.name }}</strong></td>
                                     <td>{{ student.class_id }}</td>
                                     <td>{{ student.session }}</td>
                                     <td class="action-buttons">
-                                        <a href="{{ url_for('delete_student', student_id=student.id) }}" class="delete-link" onclick="return confirm('Delete this student?')">Delete</a>
+                                        <button class="btn-small" onclick="editStudent({{ student.id }})">✏️ Edit</button>
+                                        <a href="/delete-student/{{ student.id }}" class="btn-small btn-danger" onclick="return confirm('Delete this student?')">🗑️ Delete</a>
                                         {% if subscription == 'Pro' %}
-                                            <a href="{{ url_for('download_pro_result', student_id=student.student_id) }}" class="btn-small">📄 Transcript</a>
+                                            <a href="{{ url_for('download_pro_result', student_id=student.student_id) }}" class="btn-small" target="_blank">📄 Transcript</a>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -226,6 +373,13 @@
                             </tbody>
                         </table>
                     </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👥</div>
+                        <h4>No Students Yet</h4>
+                        <p>Add students individually or bulk upload via CSV.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             
@@ -243,12 +397,13 @@
                         {% endif %}
                     </div>
                     
-                    <div class="template-buttons" style="margin-bottom: 1.5rem;">
+                    <div class="template-buttons">
                         <span style="font-size: 0.75rem; color: var(--text-muted);">📥 Download Templates:</span>
                         <a href="{{ url_for('download_csv_template', type='questions') }}" class="btn-template objective">🎯 Objective Template</a>
                         <a href="{{ url_for('download_theory_template') }}" class="btn-template theory">✍️ Theory Template</a>
                     </div>
                     
+                    {% if exams %}
                     <div style="overflow-x: auto;">
                         <table class="data-table">
                             <thead>
@@ -313,7 +468,7 @@
                                                     </form>
                                                 {% endif %}
                                                 
-                                                <a href="{{ url_for('download_result', exam_code=exam.exam_code, class_id=exam.class_id) }}" target="_blank">📄 Download Results (New Tab)</a>
+                                                <a href="{{ url_for('download_result', exam_code=exam.exam_code, class_id=exam.class_id) }}" target="_blank">📄 Download Results</a>
                                                 <button onclick="showResetStudentModal('{{ exam.exam_code }}')">🔄 Reset Student Exam</button>
                                                 <form method="POST" action="{{ url_for('delete_exam', exam_id=exam.id) }}" onsubmit="return confirm('⚠️ Delete this exam and all its questions? This cannot be undone!')">
                                                     <button type="submit" class="danger">🗑️ Delete Exam</button>
@@ -326,6 +481,13 @@
                             </tbody>
                         </table>
                     </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <h4>No Exams Yet</h4>
+                        <p>Create your first exam using the button above.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -343,14 +505,17 @@
                         <div class="input-group">
                             <label>School Logo</label>
                             <input type="file" name="logo" accept="image/*">
+                            {% if settings and settings.get('logo') %}
+                            <small style="color: var(--text-muted);">Current logo uploaded</small>
+                            {% endif %}
                         </div>
                         <div class="input-group">
                             <label>School Name</label>
-                            <input type="text" name="school_name" placeholder="School Name">
+                            <input type="text" name="school_name" placeholder="School Name" value="{{ settings.school_name if settings and settings.get('school_name') else '' }}">
                         </div>
                         <div class="input-group">
                             <label>School Address</label>
-                            <input type="text" name="address" placeholder="School Address">
+                            <input type="text" name="address" placeholder="School Address" value="{{ settings.address if settings and settings.get('address') else '' }}">
                         </div>
                     </div>
                     <button type="submit" class="btn-primary">Update Settings</button>
@@ -360,8 +525,6 @@
         {% endif %}
     </div>
 
-    <!-- ==================== MODALS ==================== -->
-    
     <!-- Add Subject Modal -->
     <div id="addSubjectModal" class="modal">
         <div class="modal-content">
@@ -408,9 +571,9 @@
             <h3>Edit Subject</h3>
             <form method="POST" id="editSubjectForm" action="{{ url_for('edit_subject') }}">
                 <input type="hidden" name="subject_id" id="edit_subject_id">
-                <div class="input-group"><input type="text" name="subject_code" id="edit_subject_code" required></div>
-                <div class="input-group"><input type="text" name="subject_name" id="edit_subject_name" required></div>
-                <div class="input-group"><textarea name="description" id="edit_subject_description" rows="3"></textarea></div>
+                <div class="input-group"><input type="text" name="subject_code" id="edit_subject_code" required placeholder="Subject Code"></div>
+                <div class="input-group"><input type="text" name="subject_name" id="edit_subject_name" required placeholder="Subject Name"></div>
+                <div class="input-group"><textarea name="description" id="edit_subject_description" rows="3" placeholder="Description"></textarea></div>
                 <button type="submit" class="btn-primary">Update Subject</button>
             </form>
         </div>
@@ -424,10 +587,44 @@
             <form method="POST" action="{{ url_for('create_student') }}">
                 <div class="input-group"><input type="text" name="name" placeholder="Full Name" required></div>
                 <div class="input-group"><input type="text" name="class_id" placeholder="Class ID" required></div>
-                <div class="input-group"><input type="text" name="session" placeholder="Session" required></div>
+                <div class="input-group"><input type="text" name="session" placeholder="Session (e.g., 2024/2025)" required></div>
                 <div class="input-group"><input type="text" name="student_id" placeholder="Student ID" required></div>
                 <div class="input-group"><input type="password" name="password" placeholder="Password" required></div>
                 <button type="submit" class="btn-primary">Create Student</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Edit Student Modal -->
+    <div id="editStudentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editStudentModal')">&times;</span>
+            <h3>✏️ Edit Student</h3>
+            <form method="POST" id="editStudentForm">
+                <input type="hidden" name="student_id" id="edit_student_id">
+                <div class="input-group">
+                    <label>Student ID</label>
+                    <input type="text" name="student_id" id="edit_student_id_value" required>
+                    <small style="color: var(--text-muted);">Unique identifier for the student</small>
+                </div>
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" name="name" id="edit_student_name" required>
+                </div>
+                <div class="input-group">
+                    <label>Class ID</label>
+                    <input type="text" name="class_id" id="edit_student_class" required>
+                </div>
+                <div class="input-group">
+                    <label>Session</label>
+                    <input type="text" name="session" id="edit_student_session" placeholder="e.g., 2024/2025" required>
+                </div>
+                <div class="input-group">
+                    <label>New Password</label>
+                    <input type="password" name="password" placeholder="Leave blank to keep current password">
+                    <small style="color: var(--text-muted);">Only enter if you want to change the password</small>
+                </div>
+                <button type="submit" class="btn-primary">Update Student</button>
             </form>
         </div>
     </div>
@@ -523,11 +720,11 @@
             <h3>Bulk Upload Questions</h3>
             <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem;">
                 <strong>🎯 Objective Format:</strong>
-                <code style="display: block; font-size: 0.7rem;">Serial No, Question, Option1, Option2, Option3, Option4, Correct Answer, Score</code>
+                <code style="display: block; font-size: 0.7rem; margin-top: 0.25rem;">Serial No, Question, Option1, Option2, Option3, Option4, Correct Answer, Score</code>
             </div>
             <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem;">
                 <strong>✍️ Theory Format:</strong>
-                <code style="display: block; font-size: 0.7rem;">Serial No, Question, Correct Answer, Score, Instructions</code>
+                <code style="display: block; font-size: 0.7rem; margin-top: 0.25rem;">Serial No, Question, Correct Answer, Score, Instructions</code>
             </div>
             <form method="POST" action="{{ url_for('upload_exam_csv') }}" enctype="multipart/form-data">
                 <div class="input-group"><input type="text" name="exam_code" placeholder="Exam Code" required></div>
@@ -549,8 +746,8 @@
             <h3>Edit Exam</h3>
             <form method="POST" id="editExamForm">
                 <input type="hidden" name="exam_id" id="edit_exam_id">
-                <div class="input-group"><input type="text" name="exam_title" id="edit_exam_title" required></div>
-                <div class="input-group"><input type="text" name="exam_code" id="edit_exam_code" required></div>
+                <div class="input-group"><input type="text" name="exam_title" id="edit_exam_title" required placeholder="Exam Title"></div>
+                <div class="input-group"><input type="text" name="exam_code" id="edit_exam_code" required placeholder="Exam Code"></div>
                 <div class="input-group">
                     <label>Subject</label>
                     <select name="subject_code" id="edit_subject_code_select">
@@ -562,8 +759,8 @@
                 </div>
                 <div class="input-group"><input type="date" name="exam_date" id="edit_exam_date" required></div>
                 <div class="input-group"><input type="time" name="exam_time" id="edit_exam_time" required></div>
-                <div class="input-group"><input type="number" name="timer_minutes" id="edit_timer_minutes" required></div>
-                <div class="input-group"><input type="text" name="class_id" id="edit_class_id" required></div>
+                <div class="input-group"><input type="number" name="timer_minutes" id="edit_timer_minutes" required placeholder="Timer (minutes)"></div>
+                <div class="input-group"><input type="text" name="class_id" id="edit_class_id" required placeholder="Target Class"></div>
                 <div class="input-group">
                     <label>Exam Type</label>
                     <select name="exam_type" id="edit_exam_type">
@@ -574,7 +771,7 @@
                 </div>
                 <div class="input-group">
                     <label>Instructions</label>
-                    <textarea name="instructions" id="edit_instructions" rows="3"></textarea>
+                    <textarea name="instructions" id="edit_instructions" rows="3" placeholder="Exam instructions"></textarea>
                 </div>
                 <button type="submit" class="btn-primary">Update Exam</button>
             </form>
@@ -597,14 +794,14 @@
             <h3>Edit Question</h3>
             <form method="POST" id="editQuestionForm">
                 <input type="hidden" name="question_id" id="edit_question_id">
-                <div class="input-group"><input type="number" name="serial_no" id="edit_serial_no" required></div>
-                <div class="input-group"><textarea name="question" id="edit_question" rows="3" required></textarea></div>
+                <div class="input-group"><input type="number" name="serial_no" id="edit_serial_no" required placeholder="Serial Number"></div>
+                <div class="input-group"><textarea name="question" id="edit_question" rows="3" required placeholder="Question text"></textarea></div>
                 <div class="input-group"><input type="text" name="option1" id="edit_option1" placeholder="Option A (leave blank for theory)"></div>
                 <div class="input-group"><input type="text" name="option2" id="edit_option2" placeholder="Option B (leave blank for theory)"></div>
                 <div class="input-group"><input type="text" name="option3" id="edit_option3" placeholder="Option C (leave blank for theory)"></div>
                 <div class="input-group"><input type="text" name="option4" id="edit_option4" placeholder="Option D (leave blank for theory)"></div>
-                <div class="input-group"><input type="text" name="correct_answer" id="edit_correct_answer" placeholder="Correct Answer / Model Answer" required></div>
-                <div class="input-group"><input type="number" name="score" id="edit_score" placeholder="Marks" required></div>
+                <div class="input-group"><input type="text" name="correct_answer" id="edit_correct_answer" required placeholder="Correct Answer / Model Answer"></div>
+                <div class="input-group"><input type="number" name="score" id="edit_score" required placeholder="Marks"></div>
                 <button type="submit" class="btn-primary">Update Question</button>
             </form>
         </div>
@@ -639,7 +836,7 @@
         </div>
     </div>
     
-    <!-- Reset Student Exam Modal -->
+    <!-- Reset Student Modal -->
     <div id="resetStudentModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('resetStudentModal')">&times;</span>
@@ -665,29 +862,105 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
-        // Question upload form handler
-        document.getElementById('questionUploadForm').onsubmit = function(e) {
-            e.preventDefault();
-            let examCode = document.getElementById('exam_code_input').value;
-            if (!examCode) { alert('Please enter exam code'); return; }
-            this.action = "{{ url_for('upload_questions', exam_code='') }}" + examCode;
-            this.submit();
-        };
+        // Theme Toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark') {
+                    document.body.classList.add('dark-theme');
+                    themeToggle.textContent = '☀️';
+                }
+                themeToggle.addEventListener('click', function() {
+                    document.body.classList.toggle('dark-theme');
+                    const isDark = document.body.classList.contains('dark-theme');
+                    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                    themeToggle.textContent = isDark ? '☀️' : '🌙';
+                });
+            }
+        });
         
-        // Modal functions
+        // Student filter function
+        function filterStudentsByClass() {
+            const selectedClass = document.getElementById('classFilter').value;
+            const rows = document.querySelectorAll('#studentsTableBody tr');
+            
+            rows.forEach(row => {
+                if (selectedClass === 'all' || row.dataset.class === selectedClass) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+        
+        function downloadStudentsPDF() {
+            const selectedClass = document.getElementById('classFilter').value;
+            window.open(`/download-students-pdf/${selectedClass}`, '_blank');
+        }
+        
+        function downloadStudentResponses(examCode) {
+            const studentId = prompt('Enter Student ID to download responses:');
+            if (studentId) {
+                window.open(`/download-student-responses/${examCode}/${studentId}`, '_blank');
+            }
+        }
+        
+        // Edit Student function
+        async function editStudent(studentId) {
+            try {
+                const response = await fetch(`/get-student/${studentId}`);
+                const student = await response.json();
+                
+                document.getElementById('edit_student_id').value = student.id;
+                document.getElementById('edit_student_id_value').value = student.student_id;
+                document.getElementById('edit_student_name').value = student.name;
+                document.getElementById('edit_student_class').value = student.class_id;
+                document.getElementById('edit_student_session').value = student.session;
+                
+                showModal('editStudentModal');
+            } catch (error) {
+                alert('Error loading student details');
+            }
+        }
+        
+        // Edit Student Form Submit
+        const editStudentForm = document.getElementById('editStudentForm');
+        if (editStudentForm) {
+            editStudentForm.onsubmit = function(e) {
+                e.preventDefault();
+                const studentId = document.getElementById('edit_student_id').value;
+                this.action = "{{ url_for('edit_student', student_id=0) }}".replace('0', studentId);
+                this.submit();
+            };
+        }
+        
+        // Question upload form handler
+        const questionUploadForm = document.getElementById('questionUploadForm');
+        if (questionUploadForm) {
+            questionUploadForm.onsubmit = function(e) {
+                e.preventDefault();
+                let examCode = document.getElementById('exam_code_input').value;
+                if (!examCode) { alert('Please enter exam code'); return; }
+                this.action = "{{ url_for('upload_questions', exam_code='') }}" + examCode;
+                this.submit();
+            };
+        }
+        
         function showModal(id) { document.getElementById(id).style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        // Collapsible sections
         function toggleCollapsible(header) {
             const content = header.nextElementSibling;
             const icon = header.querySelector('.collapsible-icon');
-            content.classList.toggle('collapsed');
-            icon.classList.toggle('collapsed');
+            if (content && icon) {
+                content.classList.toggle('collapsed');
+                icon.classList.toggle('collapsed');
+            }
         }
         
-        // Subject functions
         async function editSubject(subjectId) {
             try {
                 const response = await fetch(`/get-subject/${subjectId}`);
@@ -702,7 +975,6 @@
             }
         }
         
-        // Edit exam modal
         function showEditExamModal(examId) {
             fetch(`/get-exam/${examId}`)
                 .then(r => r.json())
@@ -722,41 +994,43 @@
                 .catch(err => alert('Error loading exam details: ' + err.message));
         }
         
-        document.getElementById('editExamForm').onsubmit = function(e) {
-            e.preventDefault();
-            const examId = document.getElementById('edit_exam_id').value;
-            this.action = "{{ url_for('edit_exam', exam_id=0) }}".replace('0', examId);
-            this.submit();
-        };
+        const editExamForm = document.getElementById('editExamForm');
+        if (editExamForm) {
+            editExamForm.onsubmit = function(e) {
+                e.preventDefault();
+                const examId = document.getElementById('edit_exam_id').value;
+                this.action = "{{ url_for('edit_exam', exam_id=0) }}".replace('0', examId);
+                this.submit();
+            };
+        }
         
-        // Edit questions
         function editQuestions(examCode) {
             fetch(`/get-questions/${examCode}`)
                 .then(r => r.json())
                 .then(data => {
                     const editor = document.getElementById('questionsEditor');
                     if (data.questions && data.questions.length > 0) {
-                        let html = '<table class="data-table"><thead> <th>#</th><th>Question</th><th>Type</th><th>Answer</th><th>Score</th><th>Actions</th> </thead><tbody>';
+                        let html = '<div style="overflow-x: auto;"><table class="data-table"><thead><th>#</th><th>Question</th><th>Type</th><th>Answer</th><th>Score</th><th>Actions</th></thead><tbody>';
                         data.questions.forEach(q => {
                             const isTheory = !q.option1 && !q.option2 && !q.option3 && !q.option4;
                             html += `<tr>
-                                <td>${q.serial_no} \n                                
-                                <td>${q.question.substring(0, 60)}${q.question.length > 60 ? '...' : ''} \n                                
-                                <td>${isTheory ? '📝 Theory' : '🎯 Objective'} \n                                
-                                <td>${q.correct_answer.substring(0, 30)}${q.correct_answer.length > 30 ? '...' : ''} \n                                
-                                <td>${q.score} \n                                
+                                <td>${q.serial_no}</td>
+                                <td>${q.question.substring(0, 60)}${q.question.length > 60 ? '...' : ''}</td>
+                                <td>${isTheory ? '📝 Theory' : '🎯 Objective'}</td>
+                                <td>${q.correct_answer.substring(0, 30)}${q.correct_answer.length > 30 ? '...' : ''}</td>
+                                <td>${q.score}</td>
                                 <td class="action-buttons">
                                     <button class="btn-small" onclick="editSingleQuestion(${q.id})">✏️ Edit</button>
                                     <form method="POST" action="{{ url_for('delete_question', question_id=0) }}".replace('0', ${q.id}) style="display: inline;" onsubmit="return confirm('Delete this question?')">
                                         <button type="submit" class="btn-small btn-danger">🗑️ Delete</button>
                                     </form>
-                                 \n                                
-                             \n`;
+                                </td>
+                            </tr>`;
                         });
-                        html += '</tbody>赶';
+                        html += '</tbody></table></div>';
                         editor.innerHTML = html;
                     } else {
-                        editor.innerHTML = '<p>No questions found for this exam.</p>';
+                        editor.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❓</div><h4>No Questions Found</h4><p>Upload questions for this exam using the CSV upload option.</p></div>';
                     }
                     showModal('editQuestionsModal');
                 })
@@ -782,14 +1056,16 @@
                 .catch(err => alert('Error loading question: ' + err.message));
         }
         
-        document.getElementById('editQuestionForm').onsubmit = function(e) {
-            e.preventDefault();
-            const questionId = document.getElementById('edit_question_id').value;
-            this.action = "{{ url_for('edit_question', question_id=0) }}".replace('0', questionId);
-            this.submit();
-        };
+        const editQuestionForm = document.getElementById('editQuestionForm');
+        if (editQuestionForm) {
+            editQuestionForm.onsubmit = function(e) {
+                e.preventDefault();
+                const questionId = document.getElementById('edit_question_id').value;
+                this.action = "{{ url_for('edit_question', question_id=0) }}".replace('0', questionId);
+                this.submit();
+            };
+        }
         
-        // Assignment functions
         function showAssignmentModal(examCode) {
             document.getElementById('assign_exam_code').value = examCode;
             document.getElementById('class_id_input').value = '';
@@ -807,13 +1083,17 @@
             if (type === 'class') {
                 classField.style.display = 'block';
                 studentField.style.display = 'none';
-                document.querySelector('#class_field input').required = true;
-                document.querySelector('#student_field select').required = false;
+                const classInput = document.querySelector('#class_field input');
+                if (classInput) classInput.required = true;
+                const studentSelect = document.querySelector('#student_field select');
+                if (studentSelect) studentSelect.required = false;
             } else {
                 classField.style.display = 'block';
                 studentField.style.display = 'block';
-                document.querySelector('#class_field input').required = true;
-                document.querySelector('#student_field select').required = true;
+                const classInput = document.querySelector('#class_field input');
+                if (classInput) classInput.required = true;
+                const studentSelect = document.querySelector('#student_field select');
+                if (studentSelect) studentSelect.required = true;
                 loadStudents();
             }
         }
@@ -840,35 +1120,40 @@
             }
         }
         
-        document.getElementById('class_id_input').addEventListener('input', function() {
-            if (document.getElementById('assignment_type').value === 'individual') {
-                loadStudents();
-            }
-        });
-        
-        document.getElementById('assignExamForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            try {
-                const response = await fetch('{{ url_for("assign_exam") }}', { method: 'POST', body: formData });
-                if (response.redirected) {
-                    window.location.href = response.url;
-                } else {
-                    const result = await response.json();
-                    if (result.error) {
-                        alert(result.error);
-                    } else {
-                        alert('Exam assigned successfully!');
-                        closeModal('assignExamModal');
-                        location.reload();
-                    }
+        const classIdInput = document.getElementById('class_id_input');
+        if (classIdInput) {
+            classIdInput.addEventListener('input', function() {
+                if (document.getElementById('assignment_type').value === 'individual') {
+                    loadStudents();
                 }
-            } catch (error) {
-                alert('Error assigning exam: ' + error.message);
-            }
-        };
+            });
+        }
         
-        // Reset student exam
+        const assignExamForm = document.getElementById('assignExamForm');
+        if (assignExamForm) {
+            assignExamForm.onsubmit = async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                try {
+                    const response = await fetch('{{ url_for("assign_exam") }}', { method: 'POST', body: formData });
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else {
+                        const result = await response.json();
+                        if (result.error) {
+                            alert(result.error);
+                        } else {
+                            alert('Exam assigned successfully!');
+                            closeModal('assignExamModal');
+                            location.reload();
+                        }
+                    }
+                } catch (error) {
+                    alert('Error assigning exam: ' + error.message);
+                }
+            };
+        }
+        
         let currentResetExamCode = '';
         
         function showResetStudentModal(examCode) {
@@ -916,15 +1201,6 @@
             }
         }
         
-        // Download student responses
-        function downloadStudentResponses(examCode) {
-            const studentId = prompt('Enter Student ID to download responses:');
-            if (studentId) {
-                window.open(`/download-student-responses/${examCode}/${studentId}`, '_blank');
-            }
-        }
-        
-        // View questions
         async function viewQuestions(examCode) {
             try {
                 const response = await fetch(`/get-questions/${examCode}`);
@@ -934,22 +1210,29 @@
                     let html = '<div style="display: flex; flex-direction: column; gap: 1rem;">';
                     data.questions.forEach(q => {
                         const isTheory = !q.option1 && !q.option2 && !q.option3 && !q.option4;
-                        html += `<div style="border:1px solid var(--border-light);border-radius:0.5rem;padding:1rem;">
-                            <strong>Q${q.serial_no}:</strong> ${q.question}<br>
-                            <small>Type: ${isTheory ? '📝 Theory' : '🎯 Objective'}<br>
-                            ${!isTheory ? `A: ${q.option1} | B: ${q.option2} | C: ${q.option3} | D: ${q.option4}<br>` : ''}
-                            Answer: ${q.correct_answer} | Score: ${q.score}</small>
+                        html += `<div style="border:1px solid var(--border-light);border-radius:0.75rem;padding:1rem;">
+                            <strong>Q${q.serial_no}:</strong> ${escapeHtml(q.question)}<br>
+                            <small style="color: var(--text-muted);">Type: ${isTheory ? '📝 Theory' : '🎯 Objective'}<br>
+                            ${!isTheory ? `Options: A: ${escapeHtml(q.option1)} | B: ${escapeHtml(q.option2)} | C: ${escapeHtml(q.option3)} | D: ${escapeHtml(q.option4)}<br>` : ''}
+                            Answer: ${escapeHtml(q.correct_answer)} | Score: ${q.score}</small>
                         </div>`;
                     });
                     html += '</div>';
                     questionsList.innerHTML = html;
                 } else {
-                    questionsList.innerHTML = '<p>No questions found for this exam.</p>';
+                    questionsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❓</div><h4>No Questions Found</h4><p>This exam has no questions yet. Upload questions using the CSV option.</p></div>';
                 }
                 showModal('viewQuestionsModal');
             } catch (error) {
                 alert('Error loading questions');
             }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text).replace(/[&<>]/g, function(m) {
+                return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;');
+            });
         }
         
         // Close modal when clicking outside
@@ -964,23 +1247,6 @@
                 setTimeout(() => alert.remove(), 300);
             });
         }, 5000);
-        
-        // Theme toggle
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                const isDark = document.body.classList.contains('dark-theme');
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
-                themeToggle.textContent = isDark ? '☀️' : '🌙';
-            });
-            
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark-theme');
-                themeToggle.textContent = '☀️';
-            }
-        }
     </script>
 </body>
 </html>

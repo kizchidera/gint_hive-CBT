@@ -1,4 +1,4 @@
-# app.py - Complete Working Version with All Features
+# app.py - Complete Working Version with Fixed Marking
 import os
 import csv
 import io
@@ -12,41 +12,32 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import pdfkit
 
-# Configure pdfkit with wkhtmltopdf path
-WKHTMLTOPDF_PATH = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-
-# Verify the file exists
-if not os.path.exists(WKHTMLTOPDF_PATH):
-    alt_path = r'C:\Program Files\wkhtmltopdf\wkhtmltopdf.exe'
-    if os.path.exists(alt_path):
-        WKHTMLTOPDF_PATH = alt_path
-    else:
-        print("Warning: wkhtmltopdf not found. PDF generation may fail.")
-
-# Configure pdfkit with the path
-config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH) if os.path.exists(WKHTMLTOPDF_PATH) else None
+# Try to import pdfkit (optional - but we're not using it anymore)
+try:
+    import pdfkit
+    PDFKIT_AVAILABLE = True
+except ImportError:
+    PDFKIT_AVAILABLE = False
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-in-production'
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=7)
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'csv', 'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Custom Jinja2 filter
 @app.template_filter('nl2br')
 def nl2br_filter(text):
-    """Convert newlines to <br> tags"""
     if not text:
         return ''
     return text.replace('\n', '<br>')
 
-# Helper functions
 def hash_password(password):
     return generate_password_hash(password)
 
@@ -54,7 +45,6 @@ def verify_password(password, hashed):
     return check_password_hash(hashed, password)
 
 def get_db_connection(db_path, timeout=30):
-    """Get database connection with timeout and WAL mode"""
     conn = sqlite3.connect(db_path, timeout=timeout)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
@@ -73,7 +63,10 @@ def init_main_db():
         subscription_level TEXT DEFAULT 'Basic',
         subscription_start TEXT,
         subscription_end TEXT,
-        db_path TEXT
+        db_path TEXT,
+        is_active INTEGER DEFAULT 1,
+        school_phone TEXT,
+        school_email TEXT
     )''')
     conn.commit()
     conn.close()
@@ -83,7 +76,6 @@ def init_school_db(db_path):
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     
-    # Subjects table
     conn.execute('''CREATE TABLE IF NOT EXISTS subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         subject_code TEXT UNIQUE,
@@ -92,7 +84,6 @@ def init_school_db(db_path):
         created_at TEXT
     )''')
     
-    # Students table
     conn.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT UNIQUE,
@@ -102,7 +93,6 @@ def init_school_db(db_path):
         password TEXT
     )''')
     
-    # Exams table with subject reference
     conn.execute('''CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_title TEXT,
@@ -117,7 +107,6 @@ def init_school_db(db_path):
         instructions TEXT
     )''')
     
-    # Questions table
     conn.execute('''CREATE TABLE IF NOT EXISTS questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_code TEXT,
@@ -131,7 +120,6 @@ def init_school_db(db_path):
         score INTEGER
     )''')
     
-    # Results table
     conn.execute('''CREATE TABLE IF NOT EXISTS results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT,
@@ -141,7 +129,6 @@ def init_school_db(db_path):
         submitted_at TEXT
     )''')
     
-    # Exam assignments table
     conn.execute('''CREATE TABLE IF NOT EXISTS exam_assignments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exam_code TEXT,
@@ -152,7 +139,6 @@ def init_school_db(db_path):
         status TEXT DEFAULT 'pending'
     )''')
     
-    # Proctor logs table with image storage
     conn.execute('''CREATE TABLE IF NOT EXISTS proctor_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT,
@@ -162,13 +148,11 @@ def init_school_db(db_path):
         created_at TEXT
     )''')
     
-    # School settings table
     conn.execute('''CREATE TABLE IF NOT EXISTS school_settings (
         key TEXT PRIMARY KEY,
         value TEXT
     )''')
     
-    # Exam attempts table for tracking retakes
     conn.execute('''CREATE TABLE IF NOT EXISTS exam_attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT,
@@ -179,7 +163,6 @@ def init_school_db(db_path):
         status TEXT DEFAULT 'in_progress'
     )''')
     
-    # Theory answers table
     conn.execute('''CREATE TABLE IF NOT EXISTS theory_answers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT,
@@ -192,7 +175,6 @@ def init_school_db(db_path):
         submitted_at TEXT
     )''')
     
-    # Student responses table
     conn.execute('''CREATE TABLE IF NOT EXISTS student_responses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT,
@@ -202,16 +184,10 @@ def init_school_db(db_path):
         submitted_at TEXT
     )''')
     
-    # Create indexes for better performance
     conn.execute('CREATE INDEX IF NOT EXISTS idx_exams_code ON exams(exam_code)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_exams_subject ON exams(subject_code)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_questions_exam ON questions(exam_code)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_assignments_exam ON exam_assignments(exam_code)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_assignments_student ON exam_assignments(student_id)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_results_student ON results(student_id)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_results_exam ON results(exam_code)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_attempts_student ON exam_attempts(student_id)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_proctor_logs ON proctor_logs(exam_code, student_id)')
     
     conn.commit()
     conn.close()
@@ -222,6 +198,16 @@ def admin_required(f):
         if not session.get('is_admin'):
             flash('Please login as admin', 'error')
             return redirect(url_for('login'))
+        try:
+            conn = get_db_connection('main.db')
+            school = conn.execute('SELECT is_active FROM schools WHERE db_path = ?', (session.get('db_path'),)).fetchone()
+            conn.close()
+            if school and school['is_active'] == 0:
+                session.clear()
+                flash('Your school account has been deactivated. Please contact the Hive Administrator.', 'error')
+                return redirect(url_for('login'))
+        except Exception:
+            pass
         return f(*args, **kwargs)
     return decorated_function
 
@@ -255,15 +241,21 @@ def login():
                 conn = get_db_connection('main.db')
                 school = conn.execute('SELECT * FROM schools WHERE admin_username = ?', (username,)).fetchone()
                 conn.close()
-                if school and verify_password(password, school['admin_password']):
-                    session.clear()
-                    session['is_admin'] = True
-                    session['school_id'] = school['id']
-                    session['school_name'] = school['school_name']
-                    session['db_path'] = school['db_path']
-                    session['subscription_level'] = school['subscription_level']
-                    flash('Welcome back, Admin!', 'success')
-                    return redirect(url_for('admin_dashboard'))
+                
+                if school:
+                    if school['is_active'] == 0:
+                        flash('Your school account has been deactivated. Please contact the Hive Administrator.', 'error')
+                        return redirect(url_for('login'))
+                    
+                    if verify_password(password, school['admin_password']):
+                        session.clear()
+                        session['is_admin'] = True
+                        session['school_id'] = school['id']
+                        session['school_name'] = school['school_name']
+                        session['db_path'] = school['db_path']
+                        session['subscription_level'] = school['subscription_level']
+                        flash('Welcome back, Admin!', 'success')
+                        return redirect(url_for('admin_dashboard'))
                 flash('Invalid admin credentials', 'error')
             except Exception as e:
                 flash(f'Login error: {str(e)}', 'error')
@@ -345,14 +337,18 @@ def create_school():
     admin_username = request.form.get('admin_username')
     admin_password = request.form.get('admin_password')
     subscription_level = request.form.get('subscription_level', 'Basic')
+    school_phone = request.form.get('school_phone', '')
+    school_email = request.form.get('school_email', '')
     
     db_path = f'school_{school_id}.db'
     
     try:
         init_school_db(db_path)
         conn = get_db_connection('main.db')
-        conn.execute('INSERT INTO schools (school_name, school_id, admin_username, admin_password, subscription_level, db_path) VALUES (?, ?, ?, ?, ?, ?)',
-                    (school_name, school_id, admin_username, hash_password(admin_password), subscription_level, db_path))
+        conn.execute('''INSERT INTO schools 
+            (school_name, school_id, admin_username, admin_password, subscription_level, db_path, school_phone, school_email, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)''',
+            (school_name, school_id, admin_username, hash_password(admin_password), subscription_level, db_path, school_phone, school_email))
         conn.commit()
         conn.close()
         flash('School created successfully', 'success')
@@ -381,53 +377,27 @@ def delete_school(school_id):
     
     return redirect(url_for('super_admin_dashboard'))
 
-@app.route('/update-subscription/<int:school_id>', methods=['POST'])
+@app.route('/toggle-school-status/<int:school_id>', methods=['POST'])
 @super_admin_required
-def update_subscription(school_id):
-    level = request.form.get('subscription_level')
-    days = int(request.form.get('duration_days', 30))
-    start_date = datetime.datetime.now().strftime('%Y-%m-%d')
-    end_date = (datetime.datetime.now() + datetime.timedelta(days=days)).strftime('%Y-%m-%d')
-    
+def toggle_school_status(school_id):
     try:
         conn = get_db_connection('main.db')
-        conn.execute('UPDATE schools SET subscription_level = ?, subscription_start = ?, subscription_end = ? WHERE id = ?',
-                    (level, start_date, end_date, school_id))
-        conn.commit()
+        school = conn.execute('SELECT is_active FROM schools WHERE id = ?', (school_id,)).fetchone()
+        if school:
+            new_status = 0 if school['is_active'] == 1 else 1
+            conn.execute('UPDATE schools SET is_active = ? WHERE id = ?', (new_status, school_id))
+            conn.commit()
+            status_text = "activated" if new_status == 1 else "deactivated"
+            flash(f'School has been {status_text}', 'success')
         conn.close()
-        flash('Subscription updated', 'success')
     except Exception as e:
-        flash(f'Error updating subscription: {str(e)}', 'error')
+        flash(f'Error toggling school status: {str(e)}', 'error')
     
     return redirect(url_for('super_admin_dashboard'))
 
-@app.route('/get-school-details/<int:school_id>')
+@app.route('/update-school', methods=['POST'])
 @super_admin_required
-def get_school_details(school_id):
-    try:
-        conn = get_db_connection('main.db')
-        school = conn.execute('SELECT id, school_name, school_id as school_identifier, admin_username, subscription_level, subscription_start, subscription_end FROM schools WHERE id = ?', (school_id,)).fetchone()
-        conn.close()
-        
-        if school:
-            school_dict = {
-                'id': school['id'],
-                'school_name': school['school_name'],
-                'school_identifier': school['school_identifier'],
-                'admin_username': school['admin_username'],
-                'subscription_level': school['subscription_level'],
-                'subscription_start': school['subscription_start'],
-                'subscription_end': school['subscription_end']
-            }
-            return jsonify(school_dict)
-        else:
-            return jsonify({'error': 'School not found'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/edit-school', methods=['POST'])
-@super_admin_required
-def edit_school():
+def update_school():
     school_id = request.form.get('school_id')
     school_name = request.form.get('school_name')
     school_identifier = request.form.get('school_identifier')
@@ -435,6 +405,8 @@ def edit_school():
     admin_password = request.form.get('admin_password')
     subscription_level = request.form.get('subscription_level')
     duration_days = request.form.get('duration_days')
+    school_phone = request.form.get('school_phone')
+    school_email = request.form.get('school_email')
     
     try:
         conn = get_db_connection('main.db')
@@ -479,6 +451,14 @@ def edit_school():
             update_fields.append('subscription_level = ?')
             update_values.append(subscription_level)
         
+        if school_phone:
+            update_fields.append('school_phone = ?')
+            update_values.append(school_phone)
+        
+        if school_email:
+            update_fields.append('school_email = ?')
+            update_values.append(school_email)
+        
         if duration_days and duration_days != '0':
             days = int(duration_days)
             if days > 0:
@@ -494,6 +474,22 @@ def edit_school():
             query = f"UPDATE schools SET {', '.join(update_fields)} WHERE id = ?"
             conn.execute(query, update_values)
             conn.commit()
+            
+            school = conn.execute('SELECT db_path FROM schools WHERE id = ?', (school_id,)).fetchone()
+            if school and school['db_path'] and os.path.exists(school['db_path']):
+                school_conn = get_db_connection(school['db_path'])
+                if subscription_level:
+                    school_conn.execute('REPLACE INTO school_settings (key, value) VALUES (?, ?)', ('subscription_level', subscription_level))
+                if duration_days and duration_days != '0':
+                    days = int(duration_days)
+                    if days > 0:
+                        start_date = datetime.datetime.now().strftime('%Y-%m-%d')
+                        end_date = (datetime.datetime.now() + datetime.timedelta(days=days)).strftime('%Y-%m-%d')
+                        school_conn.execute('REPLACE INTO school_settings (key, value) VALUES (?, ?)', ('subscription_start', start_date))
+                        school_conn.execute('REPLACE INTO school_settings (key, value) VALUES (?, ?)', ('subscription_end', end_date))
+                school_conn.commit()
+                school_conn.close()
+            
             flash('School details updated successfully', 'success')
         else:
             flash('No changes to update', 'info')
@@ -504,6 +500,64 @@ def edit_school():
     
     return redirect(url_for('super_admin_dashboard'))
 
+@app.route('/update-subscription/<int:school_id>', methods=['POST'])
+@super_admin_required
+def update_subscription(school_id):
+    level = request.form.get('subscription_level')
+    days = int(request.form.get('duration_days', 30))
+    
+    start_date = datetime.datetime.now().strftime('%Y-%m-%d')
+    end_date = (datetime.datetime.now() + datetime.timedelta(days=days)).strftime('%Y-%m-%d')
+    
+    try:
+        conn = get_db_connection('main.db')
+        conn.execute('UPDATE schools SET subscription_level = ?, subscription_start = ?, subscription_end = ? WHERE id = ?',
+                    (level, start_date, end_date, school_id))
+        conn.commit()
+        
+        school = conn.execute('SELECT db_path FROM schools WHERE id = ?', (school_id,)).fetchone()
+        conn.close()
+        
+        if school and school['db_path'] and os.path.exists(school['db_path']):
+            school_conn = get_db_connection(school['db_path'])
+            school_conn.execute('REPLACE INTO school_settings (key, value) VALUES (?, ?)', ('subscription_level', level))
+            school_conn.execute('REPLACE INTO school_settings (key, value) VALUES (?, ?)', ('subscription_start', start_date))
+            school_conn.execute('REPLACE INTO school_settings (key, value) VALUES (?, ?)', ('subscription_end', end_date))
+            school_conn.commit()
+            school_conn.close()
+        
+        flash(f'Subscription updated to {level} for {days} days', 'success')
+    except Exception as e:
+        flash(f'Error updating subscription: {str(e)}', 'error')
+    
+    return redirect(url_for('super_admin_dashboard'))
+
+@app.route('/get-school-details/<int:school_id>')
+@super_admin_required
+def get_school_details(school_id):
+    try:
+        conn = get_db_connection('main.db')
+        school = conn.execute('SELECT id, school_name, school_id as school_identifier, admin_username, subscription_level, subscription_start, subscription_end, school_phone, school_email FROM schools WHERE id = ?', (school_id,)).fetchone()
+        conn.close()
+        
+        if school:
+            school_dict = {
+                'id': school['id'],
+                'school_name': school['school_name'],
+                'school_identifier': school['school_identifier'],
+                'admin_username': school['admin_username'],
+                'subscription_level': school['subscription_level'],
+                'subscription_start': school['subscription_start'],
+                'subscription_end': school['subscription_end'],
+                'school_phone': school['school_phone'],
+                'school_email': school['school_email']
+            }
+            return jsonify(school_dict)
+        else:
+            return jsonify({'error': 'School not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ==================== ADMIN ROUTES ====================
 @app.route('/admin-dashboard')
 @admin_required
@@ -511,17 +565,59 @@ def admin_dashboard():
     subscription = session.get('subscription_level', 'Basic')
     try:
         conn = get_db_connection(session['db_path'])
+        settings = {row['key']: row['value'] for row in conn.execute('SELECT * FROM school_settings').fetchall()}
         students = conn.execute('SELECT * FROM students ORDER BY id DESC').fetchall()
         exams = conn.execute('SELECT * FROM exams ORDER BY id DESC').fetchall()
         subjects = conn.execute('SELECT * FROM subjects ORDER BY subject_code').fetchall()
+        classes = conn.execute('SELECT DISTINCT class_id FROM students WHERE class_id IS NOT NULL AND class_id != "" ORDER BY class_id').fetchall()
         conn.close()
     except Exception as e:
         flash(f'Error loading dashboard: {str(e)}', 'error')
         students = []
         exams = []
         subjects = []
+        settings = {}
+        classes = []
     
-    return render_template('admin_dashboard.html', students=students, exams=exams, subjects=subjects, subscription=subscription)
+    return render_template('admin_dashboard.html', 
+                          students=students, 
+                          exams=exams, 
+                          subjects=subjects, 
+                          subscription=subscription,
+                          settings=settings,
+                          classes=classes)
+
+@app.route('/delete-student/<int:student_id>')
+@admin_required
+def delete_student(student_id):
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            conn = get_db_connection(session['db_path'], timeout=30)
+            try:
+                student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
+                if student:
+                    conn.execute('DELETE FROM students WHERE id = ?', (student_id,))
+                    conn.commit()
+                    flash('Student deleted successfully', 'success')
+                else:
+                    flash('Student not found', 'error')
+                break
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e) and attempt < max_retries - 1:
+                    time.sleep(0.5)
+                    continue
+                else:
+                    raise e
+            finally:
+                conn.close()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                flash(f'Error deleting student: {str(e)}', 'error')
+            else:
+                time.sleep(0.5)
+    
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/create-student', methods=['POST'])
 @admin_required
@@ -561,17 +657,39 @@ def create_student():
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/delete-student/<int:student_id>')
+@app.route('/edit-student/<int:student_id>', methods=['POST'])
 @admin_required
-def delete_student(student_id):
+def edit_student(student_id):
+    name = request.form.get('name')
+    class_id = request.form.get('class_id')
+    session_year = request.form.get('session')
+    student_id_value = request.form.get('student_id')
+    password = request.form.get('password')
+    
     max_retries = 3
     for attempt in range(max_retries):
         try:
             conn = get_db_connection(session['db_path'], timeout=30)
             try:
-                conn.execute('DELETE FROM students WHERE id = ?', (student_id,))
+                existing = conn.execute('SELECT id FROM students WHERE student_id = ? AND id != ?', 
+                                       (student_id_value, student_id)).fetchone()
+                if existing:
+                    flash('Student ID already exists', 'error')
+                    return redirect(url_for('admin_dashboard'))
+                
+                if password and password.strip():
+                    conn.execute('''UPDATE students 
+                                   SET name = ?, class_id = ?, session = ?, student_id = ?, password = ?
+                                   WHERE id = ?''',
+                                (name, class_id, session_year, student_id_value, hash_password(password), student_id))
+                else:
+                    conn.execute('''UPDATE students 
+                                   SET name = ?, class_id = ?, session = ?, student_id = ?
+                                   WHERE id = ?''',
+                                (name, class_id, session_year, student_id_value, student_id))
+                
                 conn.commit()
-                flash('Student deleted', 'success')
+                flash('Student updated successfully', 'success')
                 break
             except sqlite3.OperationalError as e:
                 if "database is locked" in str(e) and attempt < max_retries - 1:
@@ -583,11 +701,44 @@ def delete_student(student_id):
                 conn.close()
         except Exception as e:
             if attempt == max_retries - 1:
-                flash(f'Error deleting student: {str(e)}', 'error')
+                flash(f'Error updating student: {str(e)}', 'error')
             else:
                 time.sleep(0.5)
     
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/get-student/<int:student_id>')
+@admin_required
+def get_student(student_id):
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            conn = get_db_connection(session['db_path'], timeout=30)
+            try:
+                student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
+                conn.close()
+                
+                if student:
+                    student_dict = {
+                        'id': student['id'],
+                        'student_id': student['student_id'],
+                        'name': student['name'],
+                        'class_id': student['class_id'],
+                        'session': student['session']
+                    }
+                    return jsonify(student_dict)
+                else:
+                    return jsonify({'error': 'Student not found'}), 404
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e) and attempt < max_retries - 1:
+                    time.sleep(0.5)
+                    continue
+                else:
+                    raise e
+            finally:
+                conn.close()
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 # ==================== SUBJECT MANAGEMENT ROUTES ====================
 @app.route('/create-subject', methods=['POST'])
@@ -850,7 +1001,6 @@ def upload_questions(exam_code):
                 
                 conn = get_db_connection(session['db_path'], timeout=30)
                 try:
-                    # Handle replace mode
                     if upload_mode == 'replace':
                         conn.execute('DELETE FROM questions WHERE exam_code = ?', (exam_code,))
                         flash('Existing questions deleted. Uploading new questions...', 'info')
@@ -863,7 +1013,6 @@ def upload_questions(exam_code):
                         if len(row) < 4:
                             continue
                             
-                        # Check if it's an objective question (has 4 options)
                         if len(row) >= 8 and row[2] and row[3] and row[4] and row[5]:
                             conn.execute('''INSERT INTO questions 
                                 (exam_code, serial_no, question, option1, option2, option3, option4, correct_answer, score) 
@@ -1001,7 +1150,6 @@ def upload_exam_csv():
                 
                 conn = get_db_connection(session['db_path'], timeout=30)
                 try:
-                    # Check if questions already exist
                     existing = conn.execute('SELECT COUNT(*) as count FROM questions WHERE exam_code = ?', (exam_code,)).fetchone()
                     if existing['count'] > 0:
                         flash('Questions already exist for this exam. Delete existing questions first or use the exam page to replace.', 'warning')
@@ -1098,6 +1246,7 @@ def update_settings():
     
     return redirect(url_for('admin_dashboard'))
 
+# ==================== ADDITIONAL ROUTES ====================
 @app.route('/get-questions/<exam_code>')
 @admin_required
 def get_questions(exam_code):
@@ -1520,14 +1669,9 @@ def delete_question(question_id):
 @app.route('/proctor-logs/<exam_code>')
 @admin_required
 def proctor_logs(exam_code):
-    """View proctor violations for an exam"""
     try:
         conn = get_db_connection(session['db_path'])
-        
-        # Get exam details
         exam = conn.execute('SELECT * FROM exams WHERE exam_code = ?', (exam_code,)).fetchone()
-        
-        # Get all violations for this exam
         violations = conn.execute('''
             SELECT pl.*, s.name as student_name, s.student_id
             FROM proctor_logs pl
@@ -1535,53 +1679,36 @@ def proctor_logs(exam_code):
             WHERE pl.exam_code = ?
             ORDER BY pl.created_at DESC
         ''', (exam_code,)).fetchall()
-        
         conn.close()
-        
         return render_template('proctor_logs.html', exam=exam, violations=violations)
     except Exception as e:
         flash(f'Error loading proctor logs: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
 
-# ==================== DOWNLOAD STUDENT RESPONSES (ADMIN) ====================
+# ==================== DOWNLOAD STUDENT RESPONSES ====================
 @app.route('/download-student-responses/<exam_code>/<student_id>')
 @admin_required
 def admin_download_student_responses(exam_code, student_id):
-    """Admin download student's exam responses"""
     try:
         conn = get_db_connection(session['db_path'])
-        
-        # Get exam details
         exam = conn.execute('SELECT * FROM exams WHERE exam_code = ?', (exam_code,)).fetchone()
-        
         if not exam:
             flash('Exam not found', 'error')
             return redirect(url_for('admin_dashboard'))
         
-        # Get student's results
-        result = conn.execute('''
-            SELECT * FROM results 
-            WHERE student_id = ? AND exam_code = ?
-        ''', (student_id, exam_code)).fetchone()
-        
+        result = conn.execute('SELECT * FROM results WHERE student_id = ? AND exam_code = ?', (student_id, exam_code)).fetchone()
         if not result:
             flash('No results found for this student', 'warning')
             return redirect(url_for('admin_dashboard'))
         
-        # Get student details
         student = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
         
-        # Get objective questions and student answers
         objective_questions = conn.execute('''
-            SELECT q.*, 
-                   CASE WHEN r.score IS NOT NULL THEN r.score ELSE NULL END as student_score
-            FROM questions q
-            LEFT JOIN results r ON q.exam_code = r.exam_code AND r.student_id = ?
+            SELECT q.* FROM questions q
             WHERE q.exam_code = ? AND (q.option1 IS NOT NULL OR q.option1 != '')
             ORDER BY q.serial_no
-        ''', (student_id, exam_code)).fetchall()
+        ''', (exam_code,)).fetchall()
         
-        # Get theory answers
         theory_answers = conn.execute('''
             SELECT ta.*, q.question, q.correct_answer, q.score as max_score
             FROM theory_answers ta
@@ -1590,14 +1717,12 @@ def admin_download_student_responses(exam_code, student_id):
             ORDER BY q.serial_no
         ''', (student_id, exam_code)).fetchall()
         
-        # Get student's submitted answers from student_responses
         student_response = conn.execute('''
             SELECT responses_json FROM student_responses 
             WHERE student_id = ? AND exam_code = ?
             ORDER BY id DESC LIMIT 1
         ''', (student_id, exam_code)).fetchone()
         
-        # Parse answers if available
         student_answers = {}
         if student_response and student_response['responses_json']:
             try:
@@ -1606,7 +1731,6 @@ def admin_download_student_responses(exam_code, student_id):
             except:
                 pass
         
-        # Add student answers to objective questions
         objective_list = []
         for q in objective_questions:
             q_dict = dict(q)
@@ -1615,7 +1739,8 @@ def admin_download_student_responses(exam_code, student_id):
         
         current_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        html = render_template('student_responses_admin.html',
+        # Return HTML directly - will open in new tab
+        return render_template('student_responses_admin.html',
                               student=student,
                               exam=exam,
                               result=result,
@@ -1626,62 +1751,36 @@ def admin_download_student_responses(exam_code, student_id):
                               total_possible=result['total_possible'],
                               percentage=round((result['score'] / result['total_possible'] * 100), 1) if result['total_possible'] > 0 else 0)
         
-        if config:
-            pdf = pdfkit.from_string(html, False, configuration=config)
-        else:
-            return html
-        
-        response = make_response(pdf)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=student_{student_id}_{exam_code}_responses.pdf'
-        return response
-        
     except Exception as e:
         flash(f'Error generating responses: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
 
-# ==================== STUDENT DOWNLOAD RESPONSES ====================
 @app.route('/download-student-responses/<exam_code>')
 def download_student_responses(exam_code):
-    """Student download their own exam responses"""
     if not session.get('is_student'):
         flash('Please login as a student', 'error')
         return redirect(url_for('login'))
     
     try:
         conn = get_db_connection(session['school_db'])
-        
-        # Get exam details
         exam = conn.execute('SELECT * FROM exams WHERE exam_code = ?', (exam_code,)).fetchone()
-        
         if not exam:
             flash('Exam not found', 'error')
             return redirect(url_for('student_dashboard'))
         
-        # Get student's results
-        result = conn.execute('''
-            SELECT * FROM results 
-            WHERE student_id = ? AND exam_code = ?
-        ''', (session['student_id'], exam_code)).fetchone()
-        
+        result = conn.execute('SELECT * FROM results WHERE student_id = ? AND exam_code = ?', (session['student_id'], exam_code)).fetchone()
         if not result:
             flash('No results found for this exam', 'warning')
             return redirect(url_for('student_dashboard'))
         
-        # Get student details
         student = conn.execute('SELECT * FROM students WHERE student_id = ?', (session['student_id'],)).fetchone()
         
-        # Get objective questions and student answers
         objective_questions = conn.execute('''
-            SELECT q.*, 
-                   CASE WHEN r.score IS NOT NULL THEN r.score ELSE NULL END as student_score
-            FROM questions q
-            LEFT JOIN results r ON q.exam_code = r.exam_code AND r.student_id = ?
+            SELECT q.* FROM questions q
             WHERE q.exam_code = ? AND (q.option1 IS NOT NULL OR q.option1 != '')
             ORDER BY q.serial_no
-        ''', (session['student_id'], exam_code)).fetchall()
+        ''', (exam_code,)).fetchall()
         
-        # Get theory answers
         theory_answers = conn.execute('''
             SELECT ta.*, q.question, q.correct_answer, q.score as max_score
             FROM theory_answers ta
@@ -1690,14 +1789,12 @@ def download_student_responses(exam_code):
             ORDER BY q.serial_no
         ''', (session['student_id'], exam_code)).fetchall()
         
-        # Get student's submitted answers from student_responses
         student_response = conn.execute('''
             SELECT responses_json FROM student_responses 
             WHERE student_id = ? AND exam_code = ?
             ORDER BY id DESC LIMIT 1
         ''', (session['student_id'], exam_code)).fetchone()
         
-        # Parse answers if available
         student_answers = {}
         if student_response and student_response['responses_json']:
             try:
@@ -1706,7 +1803,6 @@ def download_student_responses(exam_code):
             except:
                 pass
         
-        # Add student answers to objective questions
         objective_list = []
         for q in objective_questions:
             q_dict = dict(q)
@@ -1715,7 +1811,8 @@ def download_student_responses(exam_code):
         
         current_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        html = render_template('student_responses_download.html',
+        # Return HTML directly - will open in new tab
+        return render_template('student_responses_download.html',
                               student=student,
                               exam=exam,
                               result=result,
@@ -1726,24 +1823,15 @@ def download_student_responses(exam_code):
                               total_possible=result['total_possible'],
                               percentage=round((result['score'] / result['total_possible'] * 100), 1) if result['total_possible'] > 0 else 0)
         
-        if config:
-            pdf = pdfkit.from_string(html, False, configuration=config)
-        else:
-            return html
-        
-        response = make_response(pdf)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=student_{session["student_id"]}_{exam_code}_responses.pdf'
-        return response
-        
     except Exception as e:
         flash(f'Error generating responses: {str(e)}', 'error')
         return redirect(url_for('student_dashboard'))
 
-# ==================== PDF DOWNLOAD ROUTES ====================
+# ==================== PDF DOWNLOAD ROUTES (Now returns HTML in new tab) ====================
 @app.route('/download-result/<exam_code>/<class_id>')
 @admin_required
 def download_result(exam_code, class_id):
+    """Return HTML results page that opens in new tab (no PDF generation)"""
     try:
         conn = get_db_connection(session['db_path'])
         results = conn.execute('''
@@ -1757,28 +1845,31 @@ def download_result(exam_code, class_id):
         now = datetime.datetime.now()
         current_date = now.strftime('%Y-%m-%d %H:%M:%S')
         
-        html = render_template('result_pdf.html', 
+        if results:
+            percentages = []
+            for r in results:
+                if r['total_possible'] > 0:
+                    percentages.append((r['score'] / r['total_possible']) * 100)
+            avg_percentage = sum(percentages) / len(percentages) if percentages else 0
+        else:
+            avg_percentage = 0
+        
+        # Return HTML directly - will open in new tab
+        return render_template('result_pdf.html', 
                               results=results, 
                               exam_code=exam_code, 
                               class_id=class_id,
-                              current_date=current_date)
-        
-        if config:
-            pdf = pdfkit.from_string(html, False, configuration=config)
-        else:
-            return html
-        
-        response = make_response(pdf)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=results_{exam_code}.pdf'
-        return response
+                              current_date=current_date,
+                              avg_percentage=avg_percentage)
+            
     except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'error')
+        flash(f'Error generating results: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
 
 @app.route('/download-pro-result/<student_id>')
 @admin_required
 def download_pro_result(student_id):
+    """Return HTML transcript that opens in new tab (no PDF generation)"""
     if session.get('subscription_level') != 'Pro':
         flash('Pro subscription required', 'error')
         return redirect(url_for('admin_dashboard'))
@@ -1800,24 +1891,53 @@ def download_pro_result(student_id):
         current_date = now.strftime('%Y-%m-%d %H:%M:%S')
         current_year = now.strftime('%Y')
         
-        html = render_template('pro_result_pdf.html', 
+        if results:
+            percentages = []
+            for r in results:
+                if r['total_possible'] > 0:
+                    percentages.append((r['score'] / r['total_possible']) * 100)
+            avg_percentage = sum(percentages) / len(percentages) if percentages else 0
+        else:
+            avg_percentage = 0
+        
+        # Return HTML directly - will open in new tab
+        return render_template('pro_result_pdf.html', 
                               results=results, 
                               student=student, 
                               settings=settings,
                               current_date=current_date,
-                              current_year=current_year)
-        
-        if config:
-            pdf = pdfkit.from_string(html, False, configuration=config)
-        else:
-            return html
-        
-        response = make_response(pdf)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=student_{student_id}_transcript.pdf'
-        return response
+                              current_year=current_year,
+                              avg_percentage=avg_percentage)
+            
     except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'error')
+        flash(f'Error generating transcript: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/download-students-pdf/<class_id>')
+@admin_required
+def download_students_pdf(class_id):
+    """Return HTML student list that opens in new tab (no PDF generation)"""
+    try:
+        conn = get_db_connection(session['db_path'])
+        if class_id == 'all':
+            students = conn.execute('SELECT * FROM students ORDER BY name').fetchall()
+            class_name = "All Classes"
+        else:
+            students = conn.execute('SELECT * FROM students WHERE class_id = ? ORDER BY name', (class_id,)).fetchall()
+            class_name = f"Class {class_id}"
+        conn.close()
+        
+        current_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Return HTML directly - will open in new tab
+        return render_template('students_list_pdf.html',
+                              students=students,
+                              class_name=class_name,
+                              current_date=current_date,
+                              school_name=session.get('school_name', 'GINT Hive CBT'))
+            
+    except Exception as e:
+        flash(f'Error generating student list: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
 
 # ==================== STUDENT ROUTES ====================
@@ -1840,7 +1960,7 @@ def get_student_exams():
                 exams = conn.execute('''
                     SELECT e.id, e.exam_title, e.exam_code, e.subject_code, s.subject_name,
                            e.exam_date, e.exam_time, e.timer_minutes, e.is_active,
-                           e.exam_type, e.instructions, ea.status, ea.assigned_at, ea.started_at, ea.completed_at
+                           e.exam_type, e.instructions, ea.status
                     FROM exams e
                     LEFT JOIN subjects s ON e.subject_code = s.subject_code
                     INNER JOIN exam_assignments ea ON e.exam_code = ea.exam_code
@@ -1863,10 +1983,7 @@ def get_student_exams():
                         'is_active': exam['is_active'],
                         'exam_type': exam['exam_type'],
                         'instructions': exam['instructions'],
-                        'status': exam['status'],
-                        'assigned_at': exam['assigned_at'],
-                        'started_at': exam['started_at'],
-                        'completed_at': exam['completed_at']
+                        'status': exam['status']
                     })
                 
                 return jsonify({'exams': exams_list})
@@ -1885,28 +2002,6 @@ def get_student_exams():
                 time.sleep(0.5)
     
     return jsonify({'error': 'Max retries exceeded'}), 500
-
-@app.route('/get-student-results/<student_id>')
-def get_student_results(student_id):
-    if not session.get('is_student') and not session.get('is_admin'):
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    try:
-        db_path = session.get('school_db') if session.get('is_student') else session.get('db_path')
-        if not db_path:
-            return jsonify({'error': 'No database found'}), 404
-            
-        conn = get_db_connection(db_path)
-        total_exams = conn.execute('SELECT COUNT(*) as count FROM results WHERE student_id = ?', (student_id,)).fetchone()
-        avg_score = conn.execute('SELECT AVG(CAST(score AS FLOAT) / total_possible * 100) as avg FROM results WHERE student_id = ?', (student_id,)).fetchone()
-        conn.close()
-        
-        return jsonify({
-            'total_exams': total_exams['count'] if total_exams else 0,
-            'average_score': round(avg_score['avg'], 1) if avg_score and avg_score['avg'] else 0
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/take-exam/<exam_code>')
 def take_exam(exam_code):
@@ -1959,7 +2054,6 @@ def take_exam(exam_code):
                 main_conn.close()
                 subscription_level = school['subscription_level'] if school else 'Basic'
                 
-                # Track attempt
                 attempt_number = 1
                 existing_attempt = conn.execute('''
                     SELECT attempt_number FROM exam_attempts 
@@ -1970,7 +2064,6 @@ def take_exam(exam_code):
                 if existing_attempt:
                     attempt_number = existing_attempt['attempt_number'] + 1
                 
-                # Use cursor to get lastrowid
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO exam_attempts (student_id, exam_code, attempt_number, started_at, status)
@@ -2000,8 +2093,7 @@ def take_exam(exam_code):
                     'is_active': exam['is_active'],
                     'exam_type': exam['exam_type'],
                     'instructions': exam['instructions'],
-                    'status': assignment['status'],
-                    'assigned_at': assignment['assigned_at']
+                    'status': assignment['status']
                 }
                 
                 return render_template('exam.html', 
@@ -2028,6 +2120,7 @@ def take_exam(exam_code):
     
     return redirect(url_for('student_dashboard'))
 
+# ==================== SUBMIT EXAM WITH FIXED MARKING ====================
 @app.route('/submit-exam', methods=['POST'])
 def submit_exam():
     data = request.json
@@ -2035,6 +2128,7 @@ def submit_exam():
     answers = data.get('answers')
     theory_answers = data.get('theory_answers', {})
     attempt_id = data.get('attempt_id')
+    shuffled_questions = data.get('shuffled_questions', [])
     
     max_retries = 3
     for attempt in range(max_retries):
@@ -2047,7 +2141,13 @@ def submit_exam():
                 total_score = 0
                 total_possible = 0
                 
+                # Get all questions for this exam
                 questions = conn.execute('SELECT * FROM questions WHERE exam_code = ?', (exam_code,)).fetchall()
+                
+                # Debug logging
+                print(f"Submitting exam {exam_code}")
+                print(f"Received answers: {answers}")
+                print(f"Total questions: {len(questions)}")
                 
                 for q in questions:
                     total_possible += q['score']
@@ -2056,9 +2156,12 @@ def submit_exam():
                     
                     if is_theory:
                         student_answer = theory_answers.get(str(q['id']), '')
-                        score = calculate_theory_score(student_answer, q['correct_answer'])
-                        feedback = generate_feedback(student_answer, q['correct_answer'], score)
+                        # Use lenient scoring for theory
+                        score = calculate_theory_score_lenient(student_answer, q['correct_answer'])
+                        feedback = generate_feedback_lenient(student_answer, q['correct_answer'], score)
                         total_score += score
+                        
+                        print(f"Theory Q{q['id']}: Score {score}/{q['score']}")
                         
                         conn.execute('''
                             INSERT INTO theory_answers (student_id, exam_code, attempt_id, question_id, answer, score, feedback, submitted_at)
@@ -2066,8 +2169,19 @@ def submit_exam():
                         ''', (session['student_id'], exam_code, attempt_id, q['id'], student_answer, score, feedback, 
                               datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                     else:
-                        if str(q['id']) in answers and answers[str(q['id'])] == q['correct_answer']:
+                        # Objective question - compare answer
+                        student_answer = answers.get(str(q['id']))
+                        correct_answer = q['correct_answer']
+                        
+                        print(f"Objective Q{q['id']}: Student answer = {student_answer}, Correct = {correct_answer}")
+                        
+                        if student_answer and student_answer.upper() == correct_answer.upper():
                             total_score += q['score']
+                            print(f"  -> CORRECT! +{q['score']} points")
+                        else:
+                            print(f"  -> INCORRECT")
+                
+                print(f"Final score: {total_score}/{total_possible}")
                 
                 conn.execute('INSERT INTO results (student_id, exam_code, score, total_possible, submitted_at) VALUES (?, ?, ?, ?, ?)',
                             (session['student_id'], exam_code, total_score, total_possible, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
@@ -2081,7 +2195,8 @@ def submit_exam():
                 
                 responses_json = json.dumps({
                     'answers': answers,
-                    'theory_answers': theory_answers
+                    'theory_answers': theory_answers,
+                    'shuffled_questions': shuffled_questions
                 })
                 conn.execute('''
                     INSERT INTO student_responses (student_id, exam_code, attempt_id, responses_json, submitted_at)
@@ -2108,9 +2223,65 @@ def submit_exam():
     
     return jsonify({'error': 'Max retries exceeded'}), 500
 
+# ==================== LENIENT THEORY GRADING HELPERS ====================
+def calculate_theory_score_lenient(student_answer, correct_answer):
+    """Calculate theory score with lenient grading"""
+    if not student_answer or not student_answer.strip():
+        return 0
+    
+    student_lower = student_answer.lower().strip()
+    correct_lower = correct_answer.lower().strip()
+    
+    # Exact match gets full points
+    if student_lower == correct_lower:
+        return 10
+    
+    # Check for partial matches with lenient scoring
+    keywords = re.findall(r'\b\w+\b', correct_lower)
+    if not keywords:
+        return 5 if len(student_lower) > 10 else 3
+    
+    # Count matched keywords (lenient - 50% of keywords needed for partial)
+    matched_keywords = 0
+    for kw in keywords:
+        if kw in student_lower:
+            matched_keywords += 1
+    
+    # Score based on keyword matches (max 8 points)
+    keyword_score = (matched_keywords / len(keywords)) * 8 if keywords else 0
+    
+    # Length bonus (lenient)
+    length_ratio = min(len(student_lower), len(correct_lower)) / max(len(student_lower), len(correct_lower), 1)
+    length_score = length_ratio * 2
+    
+    total_score = keyword_score + length_score
+    
+    # Minimum score if they attempted something (lenient)
+    if len(student_lower) > 15 and total_score < 3:
+        total_score = 3
+    elif len(student_lower) > 5 and total_score < 2:
+        total_score = 2
+    
+    # Cap at 10 and round
+    total_score = min(10, total_score)
+    return int(round(total_score))
+
+def generate_feedback_lenient(student_answer, correct_answer, score):
+    """Generate encouraging feedback for theory answers"""
+    if score >= 8:
+        return "Excellent! Great understanding of the concept. Keep up the fantastic work! 🌟"
+    elif score >= 6:
+        return "Very good! You've grasped the main ideas. A little more detail would make it perfect! 👍"
+    elif score >= 4:
+        return "Good effort! You're on the right track. Review the key points to strengthen your answer. 📚"
+    elif score >= 2:
+        return "Fair attempt. You've got some good points. Keep practicing and you'll master this topic! 💪"
+    else:
+        return "You're making progress! Try reviewing this topic again. Every attempt helps you learn! 🌱"
+
+# ==================== PROCTOR VIOLATION ====================
 @app.route('/proctor-violation', methods=['POST'])
 def proctor_violation():
-    """Improved violation detection with face detection"""
     data = request.json
     violation_type = data.get('violation')
     image_data = data.get('image')
@@ -2186,38 +2357,30 @@ def reset_student_exam(student_id, exam_code):
     
     return jsonify({'error': 'Max retries exceeded'}), 500
 
-# ==================== THEORY GRADING HELPERS ====================
-def calculate_theory_score(student_answer, correct_answer):
-    if not student_answer or not correct_answer:
-        return 0
-    
-    student_lower = student_answer.lower().strip()
-    correct_lower = correct_answer.lower().strip()
-    
-    if student_lower == correct_lower:
-        return 10
-    
-    keywords = re.findall(r'\b\w+\b', correct_lower)
-    matched_keywords = sum(1 for kw in keywords if kw in student_lower)
-    keyword_score = (matched_keywords / len(keywords)) * 7 if keywords else 0
-    
-    length_ratio = min(len(student_lower), len(correct_lower)) / max(len(student_lower), len(correct_lower), 1)
-    length_score = length_ratio * 3
-    
-    total_score = min(10, keyword_score + length_score)
-    return round(total_score, 1)
-
-def generate_feedback(student_answer, correct_answer, score):
-    if score >= 9:
-        return "Excellent! Perfect answer."
-    elif score >= 7:
-        return "Good answer! You covered most key points."
-    elif score >= 5:
-        return "Fair answer. You missed some important points."
-    elif score >= 3:
-        return "Needs improvement. Review the material and try again."
-    else:
-        return "Incorrect. Please review the correct answer."
+# ==================== GET STUDENTS BY CLASS FILTER ====================
+@app.route('/get-students-by-class-filter/<class_id>')
+@admin_required
+def get_students_by_class_filter(class_id):
+    try:
+        conn = get_db_connection(session['db_path'])
+        if class_id == 'all':
+            students = conn.execute('SELECT * FROM students ORDER BY name').fetchall()
+        else:
+            students = conn.execute('SELECT * FROM students WHERE class_id = ? ORDER BY name', (class_id,)).fetchall()
+        conn.close()
+        
+        students_list = []
+        for s in students:
+            students_list.append({
+                'id': s['id'],
+                'student_id': s['student_id'],
+                'name': s['name'],
+                'class_id': s['class_id'],
+                'session': s['session']
+            })
+        return jsonify(students_list)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ==================== DEBUG ROUTES ====================
 @app.route('/debug-exam/<exam_code>')
@@ -2225,7 +2388,6 @@ def generate_feedback(student_answer, correct_answer, score):
 def debug_exam(exam_code):
     try:
         conn = get_db_connection(session['db_path'])
-        
         exam = conn.execute('SELECT * FROM exams WHERE exam_code = ?', (exam_code,)).fetchone()
         assignments = conn.execute('''
             SELECT ea.*, s.name as student_name 
@@ -2233,7 +2395,6 @@ def debug_exam(exam_code):
             JOIN students s ON ea.student_id = s.student_id
             WHERE ea.exam_code = ?
         ''', (exam_code,)).fetchall()
-        
         conn.close()
         
         return jsonify({

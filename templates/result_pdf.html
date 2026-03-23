@@ -1,84 +1,205 @@
-<!-- templates/result_pdf.html - Updated with Objective and Theory columns -->
+<!-- templates/result_pdf.html - Fixed with datetime issue resolved -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Exam Results - {{ exam_code }}</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 40px;
             background: white;
-            color: #333;
+            color: #1f2937;
         }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; }
-        .school-name { font-size: 24px; font-weight: bold; color: #0ea5e9; }
-        .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .results-table th { background: #0ea5e9; color: white; padding: 12px; text-align: left; }
-        .results-table td { padding: 10px; border-bottom: 1px solid #ddd; }
-        .score-columns { display: flex; justify-content: space-between; margin-top: 20px; }
-        .objective-score, .theory-score { flex: 1; text-align: center; padding: 10px; background: #f5f5f5; border-radius: 8px; margin: 0 10px; }
-        .total-score { text-align: right; margin-top: 20px; font-size: 18px; font-weight: bold; }
-        .correct { color: green; }
-        .incorrect { color: red; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #f97316;
+        }
+        .header h1 {
+            color: #f97316;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .header h3 {
+            color: #6b7280;
+            font-size: 18px;
+            font-weight: normal;
+        }
+        .exam-info {
+            background: #fef3c7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #f97316;
+        }
+        .exam-info p {
+            margin: 5px 0;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .results-table th {
+            background: #f97316;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .results-table tr:nth-child(even) {
+            background: #fef9f0;
+        }
+        .results-table tr:hover {
+            background: #ffedd5;
+        }
+        .score-high {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .score-medium {
+            color: #f97316;
+            font-weight: bold;
+        }
+        .score-low {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fef3c7;
+            border-radius: 8px;
+            text-align: right;
+        }
+        .print-date {
+            text-align: right;
+            font-size: 12px;
+            color: #f97316;
+            margin-bottom: 20px;
+        }
+        .remarks {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fef3c7;
+            border-left: 4px solid #f97316;
+            border-radius: 8px;
+            font-style: italic;
+        }
+        .encouragement {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #f97316;
+            font-style: normal;
+            font-weight: 500;
+        }
+        .school-name {
+            color: #f97316;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .school-address {
+            color: #6b7280;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
+    <div class="print-date">
+        📅 Generated: {{ current_date }}
+    </div>
+    
     <div class="header">
-        <div class="school-name">GINT Hive CBT</div>
-        <h2>Examination Results</h2>
-        <p>Exam Code: {{ exam_code }} | Class: {{ class_id }}</p>
-        <p>Date: {{ current_date }}</p>
+        <div class="school-name">🍯 GINT Hive CBT</div>
+        <div class="school-address">Empowering Education Through Technology</div>
+        <h3>Examination Results Report</h3>
+    </div>
+    
+    <div class="exam-info">
+        <p><strong>📋 Exam Code:</strong> {{ exam_code }}</p>
+        <p><strong>🏫 Class:</strong> {{ class_id if class_id else 'All Classes' }}</p>
+        <p><strong>📅 Date Generated:</strong> {{ current_date }}</p>
     </div>
     
     <table class="results-table">
         <thead>
-            <tr>
-                <th>S/N</th>
-                <th>Student ID</th>
-                <th>Student Name</th>
-                <th>Objective Score</th>
-                <th>Theory Score</th>
-                <th>Total</th>
-                <th>Percentage</th>
-                <th>Grade</th>
-            </thead>
+            <tr><th>#</th><th>Student ID</th><th>Student Name</th><th>Score</th><th>Total</th><th>Percentage</th></thead>
         <tbody>
             {% for result in results %}
             <tr>
                 <td>{{ loop.index }}</td>
                 <td>{{ result.student_id }}</td>
                 <td>{{ result.name }}</td>
-                <td>{{ result.objective_score }}/{{ result.objective_total }}</td>
-                <td>{{ result.theory_score }}/{{ result.theory_total }}</td>
-                <td><strong>{{ result.total_score }}/{{ result.total_possible }}</strong></td>
-                <td>{{ "%.1f"|format(result.percentage) }}%</td>
-                <td>
-                    {% if result.percentage >= 70 %}A
-                    {% elif result.percentage >= 60 %}B
-                    {% elif result.percentage >= 50 %}C
-                    {% elif result.percentage >= 45 %}D
-                    {% else %}F
-                    {% endif %}
-                </td>
+                <td><strong>{{ result.score }}</strong></td>
+                <td>{{ result.total_possible }}</td>
+                {% set percentage = (result.score / result.total_possible * 100) if result.total_possible > 0 else 0 %}
+                <td>{% if percentage >= 70 %}<span class="score-high">{{ "%.1f"|format(percentage) }}% 🎉</span>{% elif percentage >= 50 %}<span class="score-medium">{{ "%.1f"|format(percentage) }}% 📚</span>{% else %}<span class="score-low">{{ "%.1f"|format(percentage) }}% 💪</span>{% endif %}</td>
             </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align: center;">📭 No results found for this exam</td></tr>
             {% endfor %}
         </tbody>
     </table>
     
-    <div class="score-columns">
-        <div class="objective-score">
-            <strong>Objective Average</strong><br>
-            {{ objective_avg|default(0) }}%
-        </div>
-        <div class="theory-score">
-            <strong>Theory Average</strong><br>
-            {{ theory_avg|default(0) }}%
-        </div>
+    {% if results %}
+    <div class="summary">
+        <strong>📊 Summary Statistics:</strong><br>
+        {% set scores = results|map(attribute='score')|list %}
+        {% set totals = results|map(attribute='total_possible')|list %}
+        {% if scores %}
+            🎯 Average Score: {{ "%.1f"|format(scores|sum / scores|length) }} / {{ totals[0] if totals else 0 }}<br>
+            🏆 Highest Score: {{ scores|max }}<br>
+            📈 Lowest Score: {{ scores|min }}<br>
+            👥 Total Students: {{ results|length }}
+        {% endif %}
     </div>
     
-    <div class="total-score">
-        Class Average: {{ class_avg|default(0) }}%
+    {% set avg_score = (scores|sum / scores|length) if scores else 0 %}
+    {% set avg_percentage = (avg_score / (totals[0] if totals else 1) * 100) if totals else 0 %}
+    
+    <div class="remarks">
+        <strong>🍯 Principal's Remarks:</strong><br>
+        {% if avg_percentage >= 80 %}
+        🌟 <strong>Outstanding Achievement!</strong> This class has demonstrated exceptional mastery of the subject matter. The dedication and hard work are truly commendable. Keep reaching for excellence!
+        {% elif avg_percentage >= 70 %}
+        🎉 <strong>Excellent Performance!</strong> The class has performed wonderfully well. This reflects strong understanding and commitment to learning. With continued effort, even greater heights await!
+        {% elif avg_percentage >= 60 %}
+        👍 <strong>Very Good Work!</strong> Solid performance across the board. The class has shown good grasp of the material. A little more practice on challenging areas will yield even better results.
+        {% elif avg_percentage >= 50 %}
+        📚 <strong>Good Progress!</strong> Satisfactory results that show understanding of fundamental concepts. Every step forward counts! Keep building on this foundation.
+        {% elif avg_percentage >= 40 %}
+        💪 <strong>Room for Growth!</strong> While there are areas needing improvement, I'm confident this class has the potential to do better. Let's work together to strengthen our understanding.
+        {% else %}
+        🌱 <strong>Every Journey Begins with a Step!</strong> This is an opportunity for growth. I encourage every student to review their answers, ask questions, and practice more. Success comes to those who persist!
+        {% endif %}
+        <div class="encouragement">💡 "Success is not final, failure is not fatal: it is the courage to continue that counts." - Winston Churchill</div>
+    </div>
+    {% endif %}
+    
+    <div class="footer">
+        <p>🍯 This is an official computer-generated document from GINT Hive CBT</p>
+        <p>© {{ current_date[:4] }} GINT Hive CBT - Empowering Education Through Technology</p>
+        <p style="margin-top: 10px;">🔒 Secure & Proctored Examination System</p>
     </div>
 </body>
 </html>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard - GINT Hive CBT</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -35,6 +36,7 @@
     
     <button class="refresh-btn" onclick="loadExams()" title="Refresh Exams">🔄</button>
     
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
         let examsData = [];
         async function loadExams() {
@@ -71,12 +73,16 @@
                     ${exam.instructions ? `<div class="instructions-text">📋 ${escapeHtml(exam.instructions)}</div>` : ''}
                     <div class="exam-actions">
                         ${isAvailable ? `<button class="btn-start" onclick="event.stopPropagation(); startExam('${exam.exam_code}')">▶ Start Exam</button>` : `<button class="btn-disabled" disabled>${exam.status === 'completed' ? '✓ Completed' : '⏸ Not Available'}</button>`}
-                        ${exam.status === 'completed' ? `<button class="btn-small download-btn" onclick="event.stopPropagation(); window.open('/download-student-responses/${exam.exam_code}', '_blank')">📥 Download My Responses</button>` : ''}
+                        ${exam.status === 'completed' ? `<button class="btn-small download-btn" onclick="event.stopPropagation(); downloadResponses('${exam.exam_code}')">📥 Download My Responses</button>` : ''}
                     </div>
                 </div>`;
             });
             html += '</div>';
             container.innerHTML = html;
+        }
+        
+        function downloadResponses(examCode) {
+            window.open(`/download-student-responses/${examCode}`, '_blank');
         }
         
         function updateStats(exams) {

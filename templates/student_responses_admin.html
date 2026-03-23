@@ -32,8 +32,22 @@
     </style>
 </head>
 <body>
-    <div class="print-date">Generated: {{ current_date }} | Admin Report</div>
-    <div class="header"><div class="school-name">GINT Hive CBT <span class="admin-badge">ADMIN REPORT</span></div><div class="document-title">Student Exam Responses</div><div style="font-size:14px;color:#6b7280;">{{ exam.exam_title }} ({{ exam.exam_code }})</div></div>
+    <div class="print-date">
+        Generated: {{ current_date }} | Admin Report
+    </div>
+    
+    <div class="header">
+        <div class="school-name"> 
+            GINT Hive CBT <span class="admin-badge">ADMIN REPORT</span>
+        </div>
+        <div class="document-title">
+            Student Exam Responses
+        </div>
+        <div style="font-size:14px;color:#6b7280;">
+            {{ exam.exam_title }} ({{ exam.exam_code }})
+        </div>
+    </div>
+
     <div class="student-info"><p><span class="info-label">Student Name:</span> {{ student.name }}</p><p><span class="info-label">Student ID:</span> {{ student.student_id }}</p><p><span class="info-label">Class:</span> {{ student.class_id }}</p><p><span class="info-label">Session:</span> {{ student.session }}</p></div>
     <div class="score-summary"><div class="score-number">{{ total_score }} / {{ total_possible }}</div><div class="score-percentage">{{ percentage }}%</div></div>
     

@@ -4,11 +4,217 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hive Admin Dashboard - GINT Hive CBT</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .create-school-card {
+            background: var(--bg-card);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-light);
+            transition: all var(--transition-base) ease;
+        }
+        .create-school-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+        .create-school-card h3 {
+            color: var(--primary-500);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+        .school-item {
+            background: var(--bg-card);
+            border-radius: 1rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--border-light);
+            transition: all var(--transition-fast) ease;
+        }
+        .school-item:hover {
+            box-shadow: var(--shadow-md);
+        }
+        .school-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            background: var(--bg-tertiary);
+            border-radius: 1rem;
+            transition: all var(--transition-fast) ease;
+        }
+        .school-header:hover {
+            background: var(--primary-50);
+        }
+        .dark-theme .school-header:hover {
+            background: rgba(249, 115, 22, 0.1);
+        }
+        .school-name {
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .school-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .school-active {
+            background: var(--success-light);
+            color: var(--success);
+        }
+        .school-inactive {
+            background: var(--danger-light);
+            color: var(--danger);
+        }
+        .school-details {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--border-light);
+            display: none;
+            background: var(--bg-card);
+        }
+        .school-details.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        .detail-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: var(--primary-500);
+        }
+        .toggle-btn {
+            padding: 0.375rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast) ease;
+            border: none;
+        }
+        .toggle-active {
+            background: var(--danger);
+            color: white;
+        }
+        .toggle-active:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+        .toggle-inactive {
+            background: var(--success);
+            color: white;
+        }
+        .toggle-inactive:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+        .edit-icon {
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            transition: all var(--transition-fast) ease;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .edit-icon:hover {
+            background: var(--primary-100);
+            transform: scale(1.05);
+        }
+        .dark-theme .edit-icon:hover {
+            background: rgba(249, 115, 22, 0.2);
+        }
+        .collapsible-icon {
+            font-size: 0.875rem;
+            transition: transform var(--transition-fast) ease;
+            color: var(--text-muted);
+        }
+        .collapsible-icon.rotated {
+            transform: rotate(180deg);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stats-grid-super {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card-super {
+            background: var(--bg-card);
+            border-radius: 1.25rem;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid var(--border-light);
+            transition: all var(--transition-base) ease;
+        }
+        .stat-card-super:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+            border-color: var(--primary-200);
+        }
+        .stat-number-super {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label-super {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        .input-group-small {
+            margin-bottom: 0.5rem;
+        }
+        .input-group-small label {
+            font-size: 0.75rem;
+            display: block;
+            margin-bottom: 0.25rem;
+            color: var(--text-secondary);
+        }
+        .input-group-small input,
+        .input-group-small select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            border: 1px solid var(--border-light);
+            border-radius: 0.5rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        hr {
+            margin: 1rem 0;
+            border-color: var(--border-light);
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="navbar-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="navbar-logo" onerror="this.style.display='none'">
             <span>🐝</span>
             <h2>GINT Hive CBT - Super Admin Console</h2>
         </div>
@@ -27,96 +233,267 @@
             {% endif %}
         {% endwith %}
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number">{{ schools|length }}</div>
-                <div class="stat-label">Total Schools</div>
+        <!-- Stats Cards -->
+        <div class="stats-grid-super">
+            <div class="stat-card-super">
+                <div class="stat-number-super">{{ schools|length }}</div>
+                <div class="stat-label-super">Total Schools</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-number">{{ schools|selectattr('subscription_level', 'equalto', 'Pro')|list|length }}</div>
-                <div class="stat-label">Pro Schools</div>
+            <div class="stat-card-super">
+                <div class="stat-number-super">{{ schools|selectattr('subscription_level', 'equalto', 'Pro')|list|length }}</div>
+                <div class="stat-label-super">Pro Schools</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-number">{{ schools|selectattr('subscription_level', 'equalto', 'Basic')|list|length }}</div>
-                <div class="stat-label">Basic Schools</div>
+            <div class="stat-card-super">
+                <div class="stat-number-super">{{ schools|selectattr('subscription_level', 'equalto', 'Basic')|list|length }}</div>
+                <div class="stat-label-super">Basic Schools</div>
+            </div>
+            <div class="stat-card-super">
+                <div class="stat-number-super">{{ schools|selectattr('is_active', 'equalto', 1)|list|length }}</div>
+                <div class="stat-label-super">Active Schools</div>
             </div>
         </div>
 
-        <div class="create-school-section">
+        <!-- Create School Card - Beautiful Styling -->
+        <div class="create-school-card">
             <h3>➕ Create New School</h3>
             <form method="POST" action="{{ url_for('create_school') }}">
-                <div class="form-row">
-                    <input type="text" name="school_name" placeholder="School Name" required>
-                    <input type="text" name="school_id" placeholder="School ID (unique)" required>
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label>School Name *</label>
+                        <input type="text" name="school_name" placeholder="e.g., Sunshine High School" required>
+                    </div>
+                    <div class="input-group">
+                        <label>School ID *</label>
+                        <input type="text" name="school_id" placeholder="e.g., SUN001" required>
+                        <small style="color: var(--text-muted); font-size: 0.7rem;">Unique identifier for the school</small>
+                    </div>
+                    <div class="input-group">
+                        <label>Admin Username *</label>
+                        <input type="text" name="admin_username" placeholder="admin_username" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Admin Password *</label>
+                        <input type="password" name="admin_password" placeholder="••••••••" required>
+                    </div>
+                    <div class="input-group">
+                        <label>School Phone</label>
+                        <input type="tel" name="school_phone" placeholder="+234 801 234 5678">
+                    </div>
+                    <div class="input-group">
+                        <label>School Email</label>
+                        <input type="email" name="school_email" placeholder="info@school.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Subscription Level</label>
+                        <select name="subscription_level">
+                            <option value="Basic">Basic</option>
+                            <option value="Pro">Pro</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <input type="text" name="admin_username" placeholder="Admin Username" required>
-                    <input type="password" name="admin_password" placeholder="Admin Password" required>
-                </div>
-                <div class="form-row">
-                    <select name="subscription_level">
-                        <option value="Basic">Basic Subscription</option>
-                        <option value="Pro">Pro Subscription</option>
-                    </select>
-                    <button type="submit" class="btn-primary">Create School</button>
-                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 1rem;">Create School</button>
             </form>
         </div>
 
+        <!-- Schools Dropdown Section -->
         <div class="card">
             <h3>🏫 Managed Schools</h3>
-            <div style="overflow-x: auto;">
-                <table class="data-table">
-                    <thead>
-                        <tr><th>School Name</th><th>School ID</th><th>Admin</th><th>Subscription</th><th>Valid Until</th><th>Actions</th></thead>
-                    <tbody>
-                        {% for school in schools %}
-                        <tr>
-                            <td><strong>{{ school.school_name }}</strong></td>
-                            <td>{{ school.school_id }}</td>
-                            <td>{{ school.admin_username }}</td>
-                            <td><span class="subscription-badge {{ school.subscription_level }}">{{ school.subscription_level }}</span></td>
-                            <td>{% if school.subscription_end %}{{ school.subscription_end }}{% else %}<span style="color: var(--text-muted);">Not set</span>{% endif %}</td>
-                            <td class="action-buttons">
-                                <button class="btn-small" onclick="showSubscriptionModal({{ school.id }}, '{{ school.subscription_level }}')">💰 Update Plan</button>
-                                <a href="{{ url_for('delete_school', school_id=school.id) }}" class="btn-small btn-danger" onclick="return confirm('Delete this school?')">🗑️ Delete</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div style="margin-bottom: 1rem;">
+                <small style="color: var(--text-muted);">Click on any school to expand details</small>
             </div>
+            <div id="schools-container">
+                {% for school in schools %}
+                <div class="school-item" data-school-id="{{ school.id }}">
+                    <div class="school-header" onclick="toggleSchoolDetails({{ school.id }})">
+                        <div class="school-name">
+                            <span>🏫</span>
+                            <strong>{{ school.school_name }}</strong>
+                            <span class="school-badge {% if school.is_active == 1 %}school-active{% else %}school-inactive{% endif %}">
+                                {% if school.is_active == 1 %}● Active{% else %}○ Inactive{% endif %}
+                            </span>
+                            <span class="subscription-badge {{ school.subscription_level }}">{{ school.subscription_level }}</span>
+                        </div>
+                        <div class="action-buttons">
+                            <span class="edit-icon" onclick="event.stopPropagation(); showEditSchoolModal({{ school.id }})" title="Edit School">✏️</span>
+                            <span class="collapsible-icon" id="icon-{{ school.id }}">▼</span>
+                        </div>
+                    </div>
+                    <div id="school-details-{{ school.id }}" class="school-details">
+                        <div class="detail-row">
+                            <div><span class="detail-label">School ID:</span> {{ school.school_id }}</div>
+                            <div><span class="detail-label">Admin Username:</span> {{ school.admin_username }}</div>
+                            <div><span class="detail-label">Phone:</span> {{ school.school_phone or 'Not set' }}</div>
+                            <div><span class="detail-label">Email:</span> {{ school.school_email or 'Not set' }}</div>
+                        </div>
+                        <div class="detail-row">
+                            <div><span class="detail-label">Subscription Level:</span> {{ school.subscription_level }}</div>
+                            <div><span class="detail-label">Valid Until:</span> {{ school.subscription_end or 'Not set' }}</div>
+                            <div><span class="detail-label">Created:</span> {{ school.subscription_start or 'N/A' }}</div>
+                        </div>
+                        <hr>
+                        <div class="action-buttons" style="margin-top: 0.5rem;">
+                            <button class="toggle-btn {% if school.is_active == 1 %}toggle-active{% else %}toggle-inactive{% endif %}" 
+                                    onclick="event.stopPropagation(); toggleSchoolStatus({{ school.id }}, {{ school.is_active }})">
+                                {% if school.is_active == 1 %}🔴 Deactivate School{% else %}🟢 Activate School{% endif %}
+                            </button>
+                            <button class="btn-secondary" onclick="event.stopPropagation(); showEditSchoolModal({{ school.id }})">✏️ Edit Details</button>
+                            <a href="{{ url_for('delete_school', school_id=school.id) }}" class="btn-small btn-danger" onclick="event.stopPropagation(); return confirm('⚠️ Delete this school permanently? This action cannot be undone. All student and exam data will be lost.')">🗑️ Delete School</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not schools %}
+            <div class="no-exams" style="text-align: center; padding: 2rem;">
+                <div class="no-exams-icon">🏫</div>
+                <h3>No Schools Yet</h3>
+                <p>Create your first school using the form above.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 
-    <div id="subscriptionModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('subscriptionModal')">&times;</span>
-            <h3>Update School Subscription</h3>
-            <form method="POST" id="subscriptionForm">
-                <div class="input-group"><label>Subscription Level</label><select name="subscription_level" id="sub_level"><option value="Basic">Basic</option><option value="Pro">Pro</option></select></div>
-                <div class="input-group"><label>Duration (days)</label><input type="number" name="duration_days" value="30" min="1" max="365" required></div>
-                <button type="submit" class="btn-primary">Update Subscription</button>
+    <!-- Edit School Modal -->
+    <div id="editSchoolModal" class="modal">
+        <div class="modal-content modal-content-large">
+            <span class="close" onclick="closeModal('editSchoolModal')">&times;</span>
+            <h3>✏️ Edit School Details</h3>
+            <form method="POST" id="editSchoolForm" action="{{ url_for('update_school') }}">
+                <input type="hidden" name="school_id" id="edit_school_id">
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label>School Name</label>
+                        <input type="text" name="school_name" id="edit_school_name" required>
+                    </div>
+                    <div class="input-group">
+                        <label>School ID</label>
+                        <input type="text" name="school_identifier" id="edit_school_identifier" required>
+                        <small style="color: var(--text-muted);">Changing this will rename the database file</small>
+                    </div>
+                    <div class="input-group">
+                        <label>Admin Username</label>
+                        <input type="text" name="admin_username" id="edit_admin_username" required>
+                    </div>
+                    <div class="input-group">
+                        <label>New Password</label>
+                        <input type="password" name="admin_password" placeholder="Leave blank to keep current">
+                        <small style="color: var(--text-muted);">Only enter if you want to change the password</small>
+                    </div>
+                    <div class="input-group">
+                        <label>School Phone</label>
+                        <input type="tel" name="school_phone" id="edit_school_phone" placeholder="+234 801 234 5678">
+                    </div>
+                    <div class="input-group">
+                        <label>School Email</label>
+                        <input type="email" name="school_email" id="edit_school_email" placeholder="info@school.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Subscription Level</label>
+                        <select name="subscription_level" id="edit_subscription_level">
+                            <option value="Basic">Basic</option>
+                            <option value="Pro">Pro</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Extend Subscription (days)</label>
+                        <input type="number" name="duration_days" value="0" min="0" max="365" placeholder="0 = no change">
+                        <small style="color: var(--text-muted);">Add days to current subscription</small>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">Update School</button>
             </form>
         </div>
     </div>
 
     <script>
-        function showSubscriptionModal(schoolId, currentLevel) {
-            document.getElementById('sub_level').value = currentLevel;
-            document.getElementById('subscriptionForm').action = "{{ url_for('update_subscription', school_id=0) }}".replace('0', schoolId);
-            document.getElementById('subscriptionModal').style.display = 'flex';
+        function toggleSchoolDetails(schoolId) {
+            const details = document.getElementById(`school-details-${schoolId}`);
+            const icon = document.getElementById(`icon-${schoolId}`);
+            if (details) {
+                details.classList.toggle('show');
+                if (icon) {
+                    icon.classList.toggle('rotated');
+                }
+            }
         }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        window.onclick = function(e) { if(e.target.classList.contains('modal')) e.target.style.display = 'none'; };
         
+        async function toggleSchoolStatus(schoolId, currentStatus) {
+            const newStatus = currentStatus === 1 ? 0 : 1;
+            const action = newStatus === 1 ? 'activate' : 'deactivate';
+            if (confirm(`Are you sure you want to ${action} this school? ${action === 'deactivate' ? 'The school admin will not be able to login until reactivated.' : 'The school admin will regain access.'}`)) {
+                try {
+                    const response = await fetch(`/toggle-school-status/${schoolId}`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' } 
+                    });
+                    if (response.redirected) { 
+                        window.location.href = response.url; 
+                    } else { 
+                        location.reload(); 
+                    }
+                } catch (error) { 
+                    alert('Error toggling school status'); 
+                }
+            }
+        }
+        
+        async function showEditSchoolModal(schoolId) {
+            try {
+                const response = await fetch(`/get-school-details/${schoolId}`);
+                const school = await response.json();
+                
+                document.getElementById('edit_school_id').value = school.id;
+                document.getElementById('edit_school_name').value = school.school_name;
+                document.getElementById('edit_school_identifier').value = school.school_identifier;
+                document.getElementById('edit_admin_username').value = school.admin_username;
+                document.getElementById('edit_subscription_level').value = school.subscription_level;
+                document.getElementById('edit_school_phone').value = school.school_phone || '';
+                document.getElementById('edit_school_email').value = school.school_email || '';
+                
+                showModal('editSchoolModal');
+            } catch (error) { 
+                alert('Error loading school details'); 
+            }
+        }
+        
+        function showModal(id) { 
+            document.getElementById(id).style.display = 'flex'; 
+        }
+        
+        function closeModal(id) { 
+            document.getElementById(id).style.display = 'none'; 
+        }
+        
+        window.onclick = function(event) { 
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none'; 
+            }
+        };
+        
+        // Theme toggle
         const themeToggle = document.getElementById('theme-toggle');
-        themeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('dark-theme');
-            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
-            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙';
-        });
-        if(localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-theme'); themeToggle.textContent = '☀️'; }
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                const isDark = document.body.classList.contains('dark-theme');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                themeToggle.textContent = isDark ? '☀️' : '🌙';
+            });
+            
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+                themeToggle.textContent = '☀️';
+            }
+        }
+        
+        // Auto-hide alerts after 5 seconds
+        setTimeout(() => {
+            document.querySelectorAll('.alert').forEach(alert => {
+                alert.style.opacity = '0';
+                setTimeout(() => alert.remove(), 300);
+            });
+        }, 5000);
     </script>
 </body>
 </html>
