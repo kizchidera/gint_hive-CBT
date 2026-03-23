@@ -1,4 +1,4 @@
-# app.py - Complete Working Version with Fixed Marking
+# app.py - Complete Fixed Version
 import os
 import csv
 import io
@@ -12,13 +12,6 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-
-# Try to import pdfkit (optional - but we're not using it anymore)
-try:
-    import pdfkit
-    PDFKIT_AVAILABLE = True
-except ImportError:
-    PDFKIT_AVAILABLE = False
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
@@ -90,7 +83,8 @@ def init_school_db(db_path):
         name TEXT,
         class_id TEXT,
         session TEXT,
-        password TEXT
+        password TEXT,
+        plain_password TEXT
     )''')
     
     conn.execute('''CREATE TABLE IF NOT EXISTS exams (
@@ -126,7 +120,9 @@ def init_school_db(db_path):
         exam_code TEXT,
         score INTEGER,
         total_possible INTEGER,
-        submitted_at TEXT
+        submitted_at TEXT,
+        violation_count INTEGER DEFAULT 0,
+        auto_submit_reason TEXT
     )''')
     
     conn.execute('''CREATE TABLE IF NOT EXISTS exam_assignments (
@@ -183,6 +179,20 @@ def init_school_db(db_path):
         responses_json TEXT,
         submitted_at TEXT
     )''')
+    
+    # Add columns if they don't exist
+    try:
+        conn.execute('ALTER TABLE results ADD COLUMN violation_count INTEGER DEFAULT 0')
+    except:
+        pass
+    try:
+        conn.execute('ALTER TABLE results ADD COLUMN auto_submit_reason TEXT')
+    except:
+        pass
+    try:
+        conn.execute('ALTER TABLE students ADD COLUMN plain_password TEXT')
+    except:
+        pass
     
     conn.execute('CREATE INDEX IF NOT EXISTS idx_exams_code ON exams(exam_code)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_questions_exam ON questions(exam_code)')
@@ -274,7 +284,7 @@ def login():
                                 if verify_password(password, student['password']):
                                     password_valid = True
                             except:
-                                if password == student['password']:
+                                if password == student['plain_password']:
                                     password_valid = True
                             
                             if password_valid:
@@ -633,8 +643,8 @@ def create_student():
         try:
             conn = get_db_connection(session['db_path'], timeout=30)
             try:
-                conn.execute('INSERT INTO students (student_id, name, class_id, session, password) VALUES (?, ?, ?, ?, ?)',
-                            (student_id, name, class_id, session_year, hash_password(password)))
+                conn.execute('INSERT INTO students (student_id, name, class_id, session, password, plain_password) VALUES (?, ?, ?, ?, ?, ?)',
+                            (student_id, name, class_id, session_year, hash_password(password), password))
                 conn.commit()
                 flash('Student created successfully', 'success')
                 break
@@ -679,10 +689,12 @@ def edit_student(student_id):
                 
                 if password and password.strip():
                     conn.execute('''UPDATE students 
-                                   SET name = ?, class_id = ?, session = ?, student_id = ?, password = ?
+                                   SET name = ?, class_id = ?, session = ?, student_id = ?, password = ?, plain_password = ?
                                    WHERE id = ?''',
-                                (name, class_id, session_year, student_id_value, hash_password(password), student_id))
+                                (name, class_id, session_year, student_id_value, hash_password(password), password, student_id))
                 else:
+                    # Keep existing password
+                    current = conn.execute('SELECT plain_password FROM students WHERE id = ?', (student_id,)).fetchone()
                     conn.execute('''UPDATE students 
                                    SET name = ?, class_id = ?, session = ?, student_id = ?
                                    WHERE id = ?''',
@@ -715,7 +727,7 @@ def get_student(student_id):
         try:
             conn = get_db_connection(session['db_path'], timeout=30)
             try:
-                student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
+                student = conn.execute('SELECT id, student_id, name, class_id, session, plain_password FROM students WHERE id = ?', (student_id,)).fetchone()
                 conn.close()
                 
                 if student:
@@ -724,7 +736,8 @@ def get_student(student_id):
                         'student_id': student['student_id'],
                         'name': student['name'],
                         'class_id': student['class_id'],
-                        'session': student['session']
+                        'session': student['session'],
+                        'plain_password': student['plain_password'] if student['plain_password'] else ''
                     }
                     return jsonify(student_dict)
                 else:
@@ -1105,8 +1118,8 @@ def upload_students_csv():
                     for row in csv_input:
                         if len(row) >= 6:
                             try:
-                                conn.execute('INSERT INTO students (student_id, name, class_id, session, password) VALUES (?, ?, ?, ?, ?)',
-                                            (row[4], row[1], row[2], row[3], hash_password(row[5])))
+                                conn.execute('INSERT INTO students (student_id, name, class_id, session, password, plain_password) VALUES (?, ?, ?, ?, ?, ?)',
+                                            (row[4], row[1], row[2], row[3], hash_password(row[5]), row[5]))
                                 count += 1
                             except sqlite3.IntegrityError:
                                 pass
@@ -1445,18 +1458,20 @@ def assign_exam():
                                         (exam_code, student['student_id'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                             count += 1
                     conn.commit()
-                    flash(f'Exam assigned to {count} students in class {class_id}', 'success')
+                    conn.close()
+                    return jsonify({'success': True, 'count': count, 'message': f'Exam assigned to {count} students in class {class_id}'})
                 else:
                     existing = conn.execute('SELECT id FROM exam_assignments WHERE exam_code = ? AND student_id = ?', 
                                            (exam_code, student_id)).fetchone()
                     if existing:
-                        flash('Exam already assigned to this student', 'warning')
+                        conn.close()
+                        return jsonify({'error': 'Exam already assigned to this student'}), 400
                     else:
                         conn.execute('INSERT INTO exam_assignments (exam_code, student_id, assigned_at, status) VALUES (?, ?, ?, "pending")',
                                     (exam_code, student_id, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                         conn.commit()
-                        flash(f'Exam assigned to student {student_id}', 'success')
-                break
+                        conn.close()
+                        return jsonify({'success': True, 'message': f'Exam assigned to student {student_id}'})
             except sqlite3.OperationalError as e:
                 if "database is locked" in str(e) and attempt < max_retries - 1:
                     time.sleep(0.5)
@@ -1467,11 +1482,11 @@ def assign_exam():
                 conn.close()
         except Exception as e:
             if attempt == max_retries - 1:
-                flash(f'Error assigning exam: {str(e)}', 'error')
+                return jsonify({'error': str(e)}), 500
             else:
                 time.sleep(0.5)
     
-    return redirect(url_for('admin_dashboard'))
+    return jsonify({'error': 'Max retries exceeded'}), 500
 
 @app.route('/toggle-exam-status/<exam_code>', methods=['POST'])
 @admin_required
@@ -1703,20 +1718,14 @@ def admin_download_student_responses(exam_code, student_id):
         
         student = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
         
-        objective_questions = conn.execute('''
+        # Get ALL questions for this exam
+        all_questions = conn.execute('''
             SELECT q.* FROM questions q
-            WHERE q.exam_code = ? AND (q.option1 IS NOT NULL OR q.option1 != '')
+            WHERE q.exam_code = ?
             ORDER BY q.serial_no
         ''', (exam_code,)).fetchall()
         
-        theory_answers = conn.execute('''
-            SELECT ta.*, q.question, q.correct_answer, q.score as max_score
-            FROM theory_answers ta
-            JOIN questions q ON ta.question_id = q.id
-            WHERE ta.student_id = ? AND ta.exam_code = ?
-            ORDER BY q.serial_no
-        ''', (student_id, exam_code)).fetchall()
-        
+        # Get student's answers from student_responses
         student_response = conn.execute('''
             SELECT responses_json FROM student_responses 
             WHERE student_id = ? AND exam_code = ?
@@ -1731,25 +1740,78 @@ def admin_download_student_responses(exam_code, student_id):
             except:
                 pass
         
+        # Get theory answers with scores
+        theory_answers = conn.execute('''
+            SELECT ta.*, q.question, q.correct_answer, q.score as max_score
+            FROM theory_answers ta
+            JOIN questions q ON ta.question_id = q.id
+            WHERE ta.student_id = ? AND ta.exam_code = ?
+            ORDER BY q.serial_no
+        ''', (student_id, exam_code)).fetchall()
+        
         objective_list = []
-        for q in objective_questions:
-            q_dict = dict(q)
-            q_dict['student_answer'] = student_answers.get(str(q['id']), 'Not answered')
-            objective_list.append(q_dict)
+        theory_list = []
+        
+        for q in all_questions:
+            is_theory = exam['exam_type'] == 'theory' or (not q['option1'] and not q['option2'] and not q['option3'] and not q['option4'])
+            
+            if is_theory:
+                theory_ans = None
+                for ta in theory_answers:
+                    if ta['question_id'] == q['id']:
+                        theory_ans = ta
+                        break
+                
+                theory_list.append({
+                    'serial_no': q['serial_no'],
+                    'question': q['question'],
+                    'answer': theory_ans['answer'] if theory_ans else student_answers.get(str(q['id']), 'Not answered'),
+                    'score': theory_ans['score'] if theory_ans else 0,
+                    'max_score': q['score'],
+                    'correct_answer': q['correct_answer'],
+                    'feedback': theory_ans['feedback'] if theory_ans else ''
+                })
+            else:
+                student_answer = student_answers.get(str(q['id']), 'Not answered')
+                student_score = 0
+                is_correct = False
+                
+                if student_answer != 'Not answered' and student_answer:
+                    if student_answer.strip().upper() == q['correct_answer'].strip().upper():
+                        student_score = q['score']
+                        is_correct = True
+                
+                objective_list.append({
+                    'id': q['id'],
+                    'serial_no': q['serial_no'],
+                    'question': q['question'],
+                    'option1': q['option1'],
+                    'option2': q['option2'],
+                    'option3': q['option3'],
+                    'option4': q['option4'],
+                    'correct_answer': q['correct_answer'],
+                    'score': q['score'],
+                    'student_answer': student_answer,
+                    'student_score': student_score,
+                    'is_correct': is_correct
+                })
         
         current_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Return HTML directly - will open in new tab
+        total_score = result['score']
+        total_possible = result['total_possible']
+        percentage = round((total_score / total_possible * 100), 1) if total_possible > 0 else 0
+        
         return render_template('student_responses_admin.html',
                               student=student,
                               exam=exam,
                               result=result,
                               objective_questions=objective_list,
-                              theory_answers=theory_answers,
+                              theory_answers=theory_list,
                               current_date=current_date,
-                              total_score=result['score'],
-                              total_possible=result['total_possible'],
-                              percentage=round((result['score'] / result['total_possible'] * 100), 1) if result['total_possible'] > 0 else 0)
+                              total_score=total_score,
+                              total_possible=total_possible,
+                              percentage=percentage)
         
     except Exception as e:
         flash(f'Error generating responses: {str(e)}', 'error')
@@ -1775,19 +1837,11 @@ def download_student_responses(exam_code):
         
         student = conn.execute('SELECT * FROM students WHERE student_id = ?', (session['student_id'],)).fetchone()
         
-        objective_questions = conn.execute('''
+        all_questions = conn.execute('''
             SELECT q.* FROM questions q
-            WHERE q.exam_code = ? AND (q.option1 IS NOT NULL OR q.option1 != '')
+            WHERE q.exam_code = ?
             ORDER BY q.serial_no
         ''', (exam_code,)).fetchall()
-        
-        theory_answers = conn.execute('''
-            SELECT ta.*, q.question, q.correct_answer, q.score as max_score
-            FROM theory_answers ta
-            JOIN questions q ON ta.question_id = q.id
-            WHERE ta.student_id = ? AND ta.exam_code = ?
-            ORDER BY q.serial_no
-        ''', (session['student_id'], exam_code)).fetchall()
         
         student_response = conn.execute('''
             SELECT responses_json FROM student_responses 
@@ -1803,39 +1857,94 @@ def download_student_responses(exam_code):
             except:
                 pass
         
+        theory_answers = conn.execute('''
+            SELECT ta.*, q.question, q.correct_answer, q.score as max_score
+            FROM theory_answers ta
+            JOIN questions q ON ta.question_id = q.id
+            WHERE ta.student_id = ? AND ta.exam_code = ?
+            ORDER BY q.serial_no
+        ''', (session['student_id'], exam_code)).fetchall()
+        
         objective_list = []
-        for q in objective_questions:
-            q_dict = dict(q)
-            q_dict['student_answer'] = student_answers.get(str(q['id']), 'Not answered')
-            objective_list.append(q_dict)
+        theory_list = []
+        
+        for q in all_questions:
+            is_theory = exam['exam_type'] == 'theory' or (not q['option1'] and not q['option2'] and not q['option3'] and not q['option4'])
+            
+            if is_theory:
+                theory_ans = None
+                for ta in theory_answers:
+                    if ta['question_id'] == q['id']:
+                        theory_ans = ta
+                        break
+                
+                theory_list.append({
+                    'serial_no': q['serial_no'],
+                    'question': q['question'],
+                    'answer': theory_ans['answer'] if theory_ans else student_answers.get(str(q['id']), 'Not answered'),
+                    'score': theory_ans['score'] if theory_ans else 0,
+                    'max_score': q['score'],
+                    'correct_answer': q['correct_answer'],
+                    'feedback': theory_ans['feedback'] if theory_ans else ''
+                })
+            else:
+                student_answer = student_answers.get(str(q['id']), 'Not answered')
+                student_score = 0
+                is_correct = False
+                
+                if student_answer != 'Not answered' and student_answer:
+                    if student_answer.strip().upper() == q['correct_answer'].strip().upper():
+                        student_score = q['score']
+                        is_correct = True
+                
+                objective_list.append({
+                    'id': q['id'],
+                    'serial_no': q['serial_no'],
+                    'question': q['question'],
+                    'option1': q['option1'],
+                    'option2': q['option2'],
+                    'option3': q['option3'],
+                    'option4': q['option4'],
+                    'correct_answer': q['correct_answer'],
+                    'score': q['score'],
+                    'student_answer': student_answer,
+                    'student_score': student_score,
+                    'is_correct': is_correct
+                })
         
         current_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Return HTML directly - will open in new tab
+        total_score = result['score']
+        total_possible = result['total_possible']
+        percentage = round((total_score / total_possible * 100), 1) if total_possible > 0 else 0
+        
         return render_template('student_responses_download.html',
                               student=student,
                               exam=exam,
                               result=result,
                               objective_questions=objective_list,
-                              theory_answers=theory_answers,
+                              theory_answers=theory_list,
                               current_date=current_date,
-                              total_score=result['score'],
-                              total_possible=result['total_possible'],
-                              percentage=round((result['score'] / result['total_possible'] * 100), 1) if result['total_possible'] > 0 else 0)
+                              total_score=total_score,
+                              total_possible=total_possible,
+                              percentage=percentage)
         
     except Exception as e:
         flash(f'Error generating responses: {str(e)}', 'error')
         return redirect(url_for('student_dashboard'))
 
-# ==================== PDF DOWNLOAD ROUTES (Now returns HTML in new tab) ====================
+# ==================== PDF DOWNLOAD ROUTES ====================
 @app.route('/download-result/<exam_code>/<class_id>')
 @admin_required
 def download_result(exam_code, class_id):
-    """Return HTML results page that opens in new tab (no PDF generation)"""
     try:
         conn = get_db_connection(session['db_path'])
+        settings = {row['key']: row['value'] for row in conn.execute('SELECT * FROM school_settings').fetchall()}
+        
         results = conn.execute('''
-            SELECT s.name, s.student_id, r.score, r.total_possible 
+            SELECT s.name, s.student_id, r.score, r.total_possible, 
+                   COALESCE(r.violation_count, 0) as violation_count,
+                   COALESCE(r.auto_submit_reason, '') as auto_submit_reason
             FROM results r 
             JOIN students s ON r.student_id = s.student_id 
             WHERE r.exam_code = ? AND s.class_id = ?
@@ -1854,13 +1963,16 @@ def download_result(exam_code, class_id):
         else:
             avg_percentage = 0
         
-        # Return HTML directly - will open in new tab
+        logo_path = settings.get('logo', '')
+        
         return render_template('result_pdf.html', 
                               results=results, 
                               exam_code=exam_code, 
                               class_id=class_id,
                               current_date=current_date,
-                              avg_percentage=avg_percentage)
+                              avg_percentage=avg_percentage,
+                              logo_path=logo_path,
+                              school_name=settings.get('school_name', 'GINT Hive CBT'))
             
     except Exception as e:
         flash(f'Error generating results: {str(e)}', 'error')
@@ -1869,7 +1981,7 @@ def download_result(exam_code, class_id):
 @app.route('/download-pro-result/<student_id>')
 @admin_required
 def download_pro_result(student_id):
-    """Return HTML transcript that opens in new tab (no PDF generation)"""
+    """Return HTML transcript with correct scores"""
     if session.get('subscription_level') != 'Pro':
         flash('Pro subscription required', 'error')
         return redirect(url_for('admin_dashboard'))
@@ -1877,13 +1989,78 @@ def download_pro_result(student_id):
     try:
         conn = get_db_connection(session['db_path'])
         settings = {row['key']: row['value'] for row in conn.execute('SELECT * FROM school_settings').fetchall()}
+        
+        # Get all exam results for student
         results = conn.execute('''
-            SELECT e.exam_title, e.exam_code, r.score, r.total_possible, r.submitted_at
+            SELECT e.id, e.exam_title, e.exam_code, e.subject_code, e.exam_type, 
+                   r.score, r.total_possible, r.submitted_at,
+                   COALESCE(r.violation_count, 0) as violation_count,
+                   s.subject_name
             FROM results r 
             JOIN exams e ON r.exam_code = e.exam_code 
+            LEFT JOIN subjects s ON e.subject_code = s.subject_code
             WHERE r.student_id = ?
             ORDER BY r.submitted_at DESC
         ''', (student_id,)).fetchall()
+        
+        # Get objective scores per exam from student_responses
+        obj_scores = {}
+        theory_scores = {}
+        
+        for result in results:
+            exam_code = result['exam_code']
+            exam_type = result['exam_type']
+            
+            # Get objective questions and calculate scores
+            if exam_type == 'objective' or exam_type == 'mixed':
+                # Get all objective questions for this exam
+                obj_questions = conn.execute('''
+                    SELECT q.id, q.score, q.correct_answer
+                    FROM questions q
+                    WHERE q.exam_code = ? AND (q.option1 IS NOT NULL OR q.option1 != '')
+                    ORDER BY q.serial_no
+                ''', (exam_code,)).fetchall()
+                
+                # Get student's answers
+                student_response = conn.execute('''
+                    SELECT responses_json FROM student_responses 
+                    WHERE student_id = ? AND exam_code = ?
+                    ORDER BY id DESC LIMIT 1
+                ''', (student_id, exam_code)).fetchone()
+                
+                student_answers = {}
+                if student_response and student_response['responses_json']:
+                    try:
+                        responses_data = json.loads(student_response['responses_json'])
+                        student_answers = responses_data.get('answers', {})
+                    except:
+                        pass
+                
+                obj_total = 0
+                obj_possible = 0
+                for q in obj_questions:
+                    obj_possible += q['score']
+                    student_answer = student_answers.get(str(q['id']), '')
+                    if student_answer and student_answer.strip().upper() == q['correct_answer'].strip().upper():
+                        obj_total += q['score']
+                
+                obj_scores[exam_code] = {'score': obj_total, 'total': obj_possible}
+            
+            # Get theory scores
+            if exam_type == 'theory' or exam_type == 'mixed':
+                theory = conn.execute('''
+                    SELECT COALESCE(SUM(ta.score), 0) as total_score, 
+                           COALESCE(SUM(q.score), 0) as total_possible
+                    FROM theory_answers ta
+                    JOIN questions q ON ta.question_id = q.id
+                    WHERE ta.student_id = ? AND ta.exam_code = ?
+                ''', (student_id, exam_code)).fetchone()
+                
+                theory_scores[exam_code] = {
+                    'score': theory['total_score'] if theory else 0, 
+                    'total': theory['total_possible'] if theory else 0
+                }
+        
         student = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
         conn.close()
         
@@ -1891,23 +2068,17 @@ def download_pro_result(student_id):
         current_date = now.strftime('%Y-%m-%d %H:%M:%S')
         current_year = now.strftime('%Y')
         
-        if results:
-            percentages = []
-            for r in results:
-                if r['total_possible'] > 0:
-                    percentages.append((r['score'] / r['total_possible']) * 100)
-            avg_percentage = sum(percentages) / len(percentages) if percentages else 0
-        else:
-            avg_percentage = 0
+        logo_path = settings.get('logo', '')
         
-        # Return HTML directly - will open in new tab
         return render_template('pro_result_pdf.html', 
                               results=results, 
                               student=student, 
                               settings=settings,
+                              obj_scores=obj_scores,
+                              theory_scores=theory_scores,
                               current_date=current_date,
                               current_year=current_year,
-                              avg_percentage=avg_percentage)
+                              logo_path=logo_path)
             
     except Exception as e:
         flash(f'Error generating transcript: {str(e)}', 'error')
@@ -1916,25 +2087,27 @@ def download_pro_result(student_id):
 @app.route('/download-students-pdf/<class_id>')
 @admin_required
 def download_students_pdf(class_id):
-    """Return HTML student list that opens in new tab (no PDF generation)"""
     try:
         conn = get_db_connection(session['db_path'])
+        settings = {row['key']: row['value'] for row in conn.execute('SELECT * FROM school_settings').fetchall()}
+        
         if class_id == 'all':
-            students = conn.execute('SELECT * FROM students ORDER BY name').fetchall()
+            students = conn.execute('SELECT student_id, name, class_id, session, plain_password FROM students ORDER BY name').fetchall()
             class_name = "All Classes"
         else:
-            students = conn.execute('SELECT * FROM students WHERE class_id = ? ORDER BY name', (class_id,)).fetchall()
+            students = conn.execute('SELECT student_id, name, class_id, session, plain_password FROM students WHERE class_id = ? ORDER BY name', (class_id,)).fetchall()
             class_name = f"Class {class_id}"
         conn.close()
         
         current_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logo_path = settings.get('logo', '')
         
-        # Return HTML directly - will open in new tab
         return render_template('students_list_pdf.html',
                               students=students,
                               class_name=class_name,
                               current_date=current_date,
-                              school_name=session.get('school_name', 'GINT Hive CBT'))
+                              school_name=settings.get('school_name', 'GINT Hive CBT'),
+                              logo_path=logo_path)
             
     except Exception as e:
         flash(f'Error generating student list: {str(e)}', 'error')
@@ -2120,7 +2293,6 @@ def take_exam(exam_code):
     
     return redirect(url_for('student_dashboard'))
 
-# ==================== SUBMIT EXAM WITH FIXED MARKING ====================
 @app.route('/submit-exam', methods=['POST'])
 def submit_exam():
     data = request.json
@@ -2129,6 +2301,7 @@ def submit_exam():
     theory_answers = data.get('theory_answers', {})
     attempt_id = data.get('attempt_id')
     shuffled_questions = data.get('shuffled_questions', [])
+    auto_submit_reason = data.get('auto_submit_reason', '')
     
     max_retries = 3
     for attempt in range(max_retries):
@@ -2141,13 +2314,7 @@ def submit_exam():
                 total_score = 0
                 total_possible = 0
                 
-                # Get all questions for this exam
                 questions = conn.execute('SELECT * FROM questions WHERE exam_code = ?', (exam_code,)).fetchall()
-                
-                # Debug logging
-                print(f"Submitting exam {exam_code}")
-                print(f"Received answers: {answers}")
-                print(f"Total questions: {len(questions)}")
                 
                 for q in questions:
                     total_possible += q['score']
@@ -2156,12 +2323,9 @@ def submit_exam():
                     
                     if is_theory:
                         student_answer = theory_answers.get(str(q['id']), '')
-                        # Use lenient scoring for theory
                         score = calculate_theory_score_lenient(student_answer, q['correct_answer'])
                         feedback = generate_feedback_lenient(student_answer, q['correct_answer'], score)
                         total_score += score
-                        
-                        print(f"Theory Q{q['id']}: Score {score}/{q['score']}")
                         
                         conn.execute('''
                             INSERT INTO theory_answers (student_id, exam_code, attempt_id, question_id, answer, score, feedback, submitted_at)
@@ -2169,22 +2333,16 @@ def submit_exam():
                         ''', (session['student_id'], exam_code, attempt_id, q['id'], student_answer, score, feedback, 
                               datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                     else:
-                        # Objective question - compare answer
                         student_answer = answers.get(str(q['id']))
-                        correct_answer = q['correct_answer']
-                        
-                        print(f"Objective Q{q['id']}: Student answer = {student_answer}, Correct = {correct_answer}")
-                        
-                        if student_answer and student_answer.upper() == correct_answer.upper():
+                        if student_answer and student_answer.strip().upper() == q['correct_answer'].strip().upper():
                             total_score += q['score']
-                            print(f"  -> CORRECT! +{q['score']} points")
-                        else:
-                            print(f"  -> INCORRECT")
                 
-                print(f"Final score: {total_score}/{total_possible}")
+                violation_count = conn.execute('SELECT COUNT(*) as count FROM proctor_logs WHERE student_id = ? AND exam_code = ?', 
+                                              (session['student_id'], exam_code)).fetchone()['count']
                 
-                conn.execute('INSERT INTO results (student_id, exam_code, score, total_possible, submitted_at) VALUES (?, ?, ?, ?, ?)',
-                            (session['student_id'], exam_code, total_score, total_possible, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                conn.execute('INSERT INTO results (student_id, exam_code, score, total_possible, submitted_at, violation_count, auto_submit_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                            (session['student_id'], exam_code, total_score, total_possible, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                             violation_count, auto_submit_reason))
                 
                 conn.execute('UPDATE exam_assignments SET status = "completed", completed_at = ? WHERE exam_code = ? AND student_id = ?',
                             (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exam_code, session['student_id']))
@@ -2206,7 +2364,7 @@ def submit_exam():
                 conn.commit()
                 conn.close()
                 
-                return jsonify({'score': total_score, 'total': total_possible})
+                return jsonify({'score': total_score, 'total': total_possible, 'violation_count': violation_count})
             except sqlite3.OperationalError as e:
                 if "database is locked" in str(e) and attempt < max_retries - 1:
                     time.sleep(0.5)
@@ -2225,49 +2383,39 @@ def submit_exam():
 
 # ==================== LENIENT THEORY GRADING HELPERS ====================
 def calculate_theory_score_lenient(student_answer, correct_answer):
-    """Calculate theory score with lenient grading"""
     if not student_answer or not student_answer.strip():
         return 0
     
     student_lower = student_answer.lower().strip()
     correct_lower = correct_answer.lower().strip()
     
-    # Exact match gets full points
     if student_lower == correct_lower:
         return 10
     
-    # Check for partial matches with lenient scoring
     keywords = re.findall(r'\b\w+\b', correct_lower)
     if not keywords:
         return 5 if len(student_lower) > 10 else 3
     
-    # Count matched keywords (lenient - 50% of keywords needed for partial)
     matched_keywords = 0
     for kw in keywords:
         if kw in student_lower:
             matched_keywords += 1
     
-    # Score based on keyword matches (max 8 points)
     keyword_score = (matched_keywords / len(keywords)) * 8 if keywords else 0
-    
-    # Length bonus (lenient)
     length_ratio = min(len(student_lower), len(correct_lower)) / max(len(student_lower), len(correct_lower), 1)
     length_score = length_ratio * 2
     
     total_score = keyword_score + length_score
     
-    # Minimum score if they attempted something (lenient)
     if len(student_lower) > 15 and total_score < 3:
         total_score = 3
     elif len(student_lower) > 5 and total_score < 2:
         total_score = 2
     
-    # Cap at 10 and round
     total_score = min(10, total_score)
     return int(round(total_score))
 
 def generate_feedback_lenient(student_answer, correct_answer, score):
-    """Generate encouraging feedback for theory answers"""
     if score >= 8:
         return "Excellent! Great understanding of the concept. Keep up the fantastic work! 🌟"
     elif score >= 6:
@@ -2415,7 +2563,7 @@ def debug_students():
         if school_file.startswith('school_') and school_file.endswith('.db'):
             try:
                 conn = get_db_connection(school_file)
-                students = conn.execute('SELECT student_id, name, class_id, session FROM students').fetchall()
+                students = conn.execute('SELECT student_id, name, class_id, session, plain_password FROM students').fetchall()
                 conn.close()
                 result[school_file] = [dict(student) for student in students]
             except Exception as e:

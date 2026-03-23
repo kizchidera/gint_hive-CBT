@@ -1,9 +1,9 @@
-<!-- templates/result_pdf.html - Fixed with datetime issue resolved -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Exam Results - {{ exam_code }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <style>
         * {
             margin: 0;
@@ -15,6 +15,34 @@
             padding: 40px;
             background: white;
             color: #1f2937;
+            position: relative;
+        }
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.1;
+            z-index: 0;
+            pointer-events: none;
+            text-align: center;
+        }
+        .watermark img {
+            max-width: 300px;
+            max-height: 300px;
+            width: auto;
+            height: auto;
+        }
+        .watermark-text {
+            font-size: 48px;
+            font-weight: bold;
+            color: #f97316;
+            white-space: nowrap;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+            background: white;
         }
         .header {
             text-align: center;
@@ -76,6 +104,15 @@
             color: #ef4444;
             font-weight: bold;
         }
+        .violation-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #fee2e2;
+            color: #dc2626;
+        }
         .footer {
             margin-top: 40px;
             padding-top: 20px;
@@ -122,84 +159,113 @@
             color: #6b7280;
             font-size: 12px;
         }
+        @media print {
+            .watermark {
+                opacity: 0.15;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="print-date">
-        📅 Generated: {{ current_date }}
-    </div>
-    
-    <div class="header">
-        <div class="school-name">🍯 GINT Hive CBT</div>
-        <div class="school-address">Empowering Education Through Technology</div>
-        <h3>Examination Results Report</h3>
-    </div>
-    
-    <div class="exam-info">
-        <p><strong>📋 Exam Code:</strong> {{ exam_code }}</p>
-        <p><strong>🏫 Class:</strong> {{ class_id if class_id else 'All Classes' }}</p>
-        <p><strong>📅 Date Generated:</strong> {{ current_date }}</p>
-    </div>
-    
-    <table class="results-table">
-        <thead>
-            <tr><th>#</th><th>Student ID</th><th>Student Name</th><th>Score</th><th>Total</th><th>Percentage</th></thead>
-        <tbody>
-            {% for result in results %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ result.student_id }}</td>
-                <td>{{ result.name }}</td>
-                <td><strong>{{ result.score }}</strong></td>
-                <td>{{ result.total_possible }}</td>
-                {% set percentage = (result.score / result.total_possible * 100) if result.total_possible > 0 else 0 %}
-                <td>{% if percentage >= 70 %}<span class="score-high">{{ "%.1f"|format(percentage) }}% 🎉</span>{% elif percentage >= 50 %}<span class="score-medium">{{ "%.1f"|format(percentage) }}% 📚</span>{% else %}<span class="score-low">{{ "%.1f"|format(percentage) }}% 💪</span>{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="6" style="text-align: center;">📭 No results found for this exam</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    
-    {% if results %}
-    <div class="summary">
-        <strong>📊 Summary Statistics:</strong><br>
-        {% set scores = results|map(attribute='score')|list %}
-        {% set totals = results|map(attribute='total_possible')|list %}
-        {% if scores %}
-            🎯 Average Score: {{ "%.1f"|format(scores|sum / scores|length) }} / {{ totals[0] if totals else 0 }}<br>
-            🏆 Highest Score: {{ scores|max }}<br>
-            📈 Lowest Score: {{ scores|min }}<br>
-            👥 Total Students: {{ results|length }}
-        {% endif %}
-    </div>
-    
-    {% set avg_score = (scores|sum / scores|length) if scores else 0 %}
-    {% set avg_percentage = (avg_score / (totals[0] if totals else 1) * 100) if totals else 0 %}
-    
-    <div class="remarks">
-        <strong>🍯 Principal's Remarks:</strong><br>
-        {% if avg_percentage >= 80 %}
-        🌟 <strong>Outstanding Achievement!</strong> This class has demonstrated exceptional mastery of the subject matter. The dedication and hard work are truly commendable. Keep reaching for excellence!
-        {% elif avg_percentage >= 70 %}
-        🎉 <strong>Excellent Performance!</strong> The class has performed wonderfully well. This reflects strong understanding and commitment to learning. With continued effort, even greater heights await!
-        {% elif avg_percentage >= 60 %}
-        👍 <strong>Very Good Work!</strong> Solid performance across the board. The class has shown good grasp of the material. A little more practice on challenging areas will yield even better results.
-        {% elif avg_percentage >= 50 %}
-        📚 <strong>Good Progress!</strong> Satisfactory results that show understanding of fundamental concepts. Every step forward counts! Keep building on this foundation.
-        {% elif avg_percentage >= 40 %}
-        💪 <strong>Room for Growth!</strong> While there are areas needing improvement, I'm confident this class has the potential to do better. Let's work together to strengthen our understanding.
+    <!-- Watermark with fallback -->
+    <div class="watermark">
+        {% if logo_path and logo_path != '' and logo_path != 'None' and logo_path != 'null' %}
+            <img src="{{ logo_path }}" alt="School Logo" onerror="this.src='{{ url_for('static', filename='logo.png') }}'; this.onerror=null;">
         {% else %}
-        🌱 <strong>Every Journey Begins with a Step!</strong> This is an opportunity for growth. I encourage every student to review their answers, ask questions, and practice more. Success comes to those who persist!
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Default Logo">
         {% endif %}
-        <div class="encouragement">💡 "Success is not final, failure is not fatal: it is the courage to continue that counts." - Winston Churchill</div>
     </div>
-    {% endif %}
     
-    <div class="footer">
-        <p>🍯 This is an official computer-generated document from GINT Hive CBT</p>
-        <p>© {{ current_date[:4] }} GINT Hive CBT - Empowering Education Through Technology</p>
-        <p style="margin-top: 10px;">🔒 Secure & Proctored Examination System</p>
+    <div class="content">
+        <div class="print-date">
+            📅 Generated: {{ current_date }}
+        </div>
+        
+        <div class="header">
+            <div class="school-name">🍯 {{ school_name }}</div>
+            <div class="school-address">Empowering Education Through Technology</div>
+            <h3>Examination Results Report</h3>
+        </div>
+        
+        <div class="exam-info">
+            <p><strong>📋 Exam Code:</strong> {{ exam_code }}</p>
+            <p><strong>🏫 Class:</strong> {{ class_id if class_id else 'All Classes' }}</p>
+            <p><strong>📅 Date Generated:</strong> {{ current_date }}</p>
+        </div>
+        
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Student ID</th>
+                    <th>Student Name</th>
+                    <th>Score</th>
+                    <th>Total</th>
+                    <th>Percentage</th>
+                    <th>Violations</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in results %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ result.student_id }}</td>
+                    <td>{{ result.name }}</td>
+                    <td><strong>{{ result.score }}</strong></td>
+                    <td>{{ result.total_possible }}</td>
+                    {% set percentage = (result.score / result.total_possible * 100) if result.total_possible > 0 else 0 %}
+                    <td>{% if percentage >= 70 %}<span class="score-high">{{ "%.1f"|format(percentage) }}% 🎉</span>{% elif percentage >= 50 %}<span class="score-medium">{{ "%.1f"|format(percentage) }}% 📚</span>{% else %}<span class="score-low">{{ "%.1f"|format(percentage) }}% 💪</span>{% endif %}</td>
+                    <td>{% if result.violation_count > 0 %}<span class="violation-badge">⚠️ {{ result.violation_count }}</span>{% else %}<span style="color: #10b981;">✓ 0</span>{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center;">📭 No results found for this exam</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if results %}
+        <div class="summary">
+            <strong>📊 Summary Statistics:</strong><br>
+            {% set scores = results|map(attribute='score')|list %}
+            {% set totals = results|map(attribute='total_possible')|list %}
+            {% if scores %}
+                🎯 Average Score: {{ "%.1f"|format(scores|sum / scores|length) }} / {{ totals[0] if totals else 0 }}<br>
+                🏆 Highest Score: {{ scores|max }}<br>
+                📈 Lowest Score: {{ scores|min }}<br>
+                👥 Total Students: {{ results|length }}<br>
+                ⚠️ Students with Violations: {{ results|selectattr('violation_count', 'greaterthan', 0)|list|length }}
+            {% endif %}
+        </div>
+        
+        {% set avg_score = (scores|sum / scores|length) if scores else 0 %}
+        {% set avg_percentage = (avg_score / (totals[0] if totals else 1) * 100) if totals else 0 %}
+        
+        <div class="remarks">
+            <strong>🍯 Principal's Remarks:</strong><br>
+            {% if avg_percentage >= 80 %}
+            🌟 <strong>Outstanding Achievement!</strong> This class has demonstrated exceptional mastery of the subject matter. The dedication and hard work are truly commendable. Keep reaching for excellence!
+            {% elif avg_percentage >= 70 %}
+            🎉 <strong>Excellent Performance!</strong> The class has performed wonderfully well. This reflects strong understanding and commitment to learning. With continued effort, even greater heights await!
+            {% elif avg_percentage >= 60 %}
+            👍 <strong>Very Good Work!</strong> Solid performance across the board. The class has shown good grasp of the material. A little more practice on challenging areas will yield even better results.
+            {% elif avg_percentage >= 50 %}
+            📚 <strong>Good Progress!</strong> Satisfactory results that show understanding of fundamental concepts. Every step forward counts! Keep building on this foundation.
+            {% elif avg_percentage >= 40 %}
+            💪 <strong>Room for Growth!</strong> While there are areas needing improvement, I'm confident this class has the potential to do better. Let's work together to strengthen our understanding.
+            {% else %}
+            🌱 <strong>Every Journey Begins with a Step!</strong> This is an opportunity for growth. I encourage every student to review their answers, ask questions, and practice more. Success comes to those who persist!
+            {% endif %}
+            <div class="encouragement">💡 "Success is not final, failure is not fatal: it is the courage to continue that counts." - Winston Churchill</div>
+        </div>
+        {% endif %}
+        
+        <div class="footer">
+            <p>🍯 This is an official computer-generated document from GINT Hive CBT</p>
+            <p>© {{ current_date[:4] }} GINT Hive CBT - Empowering Education Through Technology</p>
+            <p style="margin-top: 10px;">🔒 Secure & Proctored Examination System</p>
+        </div>
     </div>
 </body>
 </html>

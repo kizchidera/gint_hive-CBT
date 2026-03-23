@@ -15,6 +15,8 @@
         .camera-container .camera-label { position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
         .violation-warning { position: fixed; top: 20px; right: 20px; background: var(--danger); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: bold; z-index: 1001; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .camera-capture-popup { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--primary-500); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1002; animation: fadeOut 2s ease forwards; pointer-events: none; }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
         .exam-header { background: var(--bg-secondary); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 1rem; }
         .timer { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, var(--primary-500), var(--primary-600)); -webkit-background-clip: text; background-clip: text; color: transparent; font-feature-settings: "tnum"; font-family: monospace; letter-spacing: 2px; }
         .exam-container { padding: 2rem; max-width: 800px; margin: 0 auto; height: calc(100vh - 80px); overflow-y: auto; }
@@ -100,7 +102,7 @@
     </div>
     
     <div id="camera-container" class="camera-container" style="display: none;"><video id="camera-video" autoplay muted playsinline></video><div class="camera-label">📷 Monitoring</div></div>
-    <div id="violation-counter" class="violation-counter" style="display: none;">⚠️ VIOLATIONS: <span id="violation-count">0</span> / 7</div>
+    <div id="violation-counter" class="violation-counter" style="display: none;">⚠️ VIOLATIONS: <span id="violation-count">0</span></div>
 
     <div class="exam-container" style="display: none;">
         <div class="question-panel">
@@ -120,6 +122,8 @@
             <h3>📊 Exam Submitted</h3>
             <p style="font-size: 1.5rem; margin: 1rem 0;">Your Score: <strong id="final-score"></strong> / <strong id="total-possible"></strong></p>
             <p id="score-percentage"></p>
+            <p id="violation-result" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-muted);"></p>
+            <p id="auto-submit-reason" style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--warning);"></p>
             <button onclick="closeModalAndRedirect()" class="btn-primary">Return to Dashboard</button>
         </div>
     </div>
@@ -134,16 +138,11 @@
             return array;
         }
         
-        // Get questions from server and shuffle for this user (only questions, NOT options)
+        // Get questions from server and shuffle for this user
         const originalQuestions = {{ questions|tojson }};
         
-        // Create a deep copy of questions for this user session
         let userQuestions = JSON.parse(JSON.stringify(originalQuestions));
-        
-        // Shuffle ONLY the order of questions for this user (options remain in original order)
         userQuestions = shuffleArray(userQuestions);
-        
-        // Re-number serial numbers after shuffling
         userQuestions.forEach((q, index) => {
             q.serial_no = index + 1;
         });
@@ -157,17 +156,19 @@
         const examType = "{{ exam.exam_type }}";
         
         let currentIndex = 0;
-        let answers = {};  // Store the ANSWER TEXT (e.g., "5", "10", "90 degree")
+        let answers = {};
         let theoryAnswers = {};
         let timerInterval;
         let stream = null;
         let motionInterval = null;
         let violationCount = 0;
-        let fullscreenExitCount = 0;
+        let fullscreenExitTime = null;
+        let fullscreenExitTimer = null;
         let examStarted = false;
         let proctoringActive = false;
         let lastFrame = null;
-        const VIOLATION_LIMIT = 7;
+        let autoSubmitReason = '';
+        const FULLSCREEN_EXIT_DELAY = 5000; // 5 seconds delay before auto-submit
         
         const fullscreenPrompt = document.getElementById('fullscreen-prompt');
         const examContainer = document.querySelector('.exam-container');
@@ -175,6 +176,37 @@
         const cameraVideo = document.getElementById('camera-video');
         const violationCounter = document.getElementById('violation-counter');
         const fullscreenManualBtn = document.getElementById('fullscreen-manual-btn');
+        
+        function showCameraCapturePopup() {
+            const popup = document.createElement('div');
+            popup.className = 'camera-capture-popup';
+            popup.innerHTML = '📸 Camera captured scene';
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 2000);
+        }
+        
+        async function captureAndSendImage() {
+            if (!stream || !cameraVideo || !cameraVideo.videoWidth) return;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = cameraVideo.videoWidth;
+            canvas.height = cameraVideo.videoHeight;
+            canvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+            const img = canvas.toDataURL('image/jpeg', 0.5);
+            
+            // This is recorded as a violation
+            await fetch('/proctor-violation', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ exam_code: examCode, violation: 'camera_capture', image: img }) 
+            });
+            
+            violationCount++;
+            const countEl = document.getElementById('violation-count');
+            if (countEl) countEl.textContent = violationCount;
+            
+            showCameraCapturePopup();
+        }
         
         // Theme toggle for exam page
         const themeToggleExam = document.getElementById('theme-toggle-exam');
@@ -218,7 +250,7 @@
                         } else {
                             if (fullscreenManualBtn) fullscreenManualBtn.style.display = 'inline-flex';
                             startExam();
-                            showWarning('⚠️ Please click the Fullscreen button or press F11 for fullscreen mode');
+                            showViolationWarning('⚠️ Please click the Fullscreen button or press F11 for fullscreen mode');
                         }
                     }, 500);
                 } 
@@ -239,6 +271,12 @@
                     if (cameraContainer) cameraContainer.style.display = 'block'; 
                     if (violationCounter) violationCounter.style.display = 'block'; 
                 }, 500);
+                // Capture periodic images every 30 seconds - counts as violation
+                setInterval(() => {
+                    if (examStarted && proctoringActive) {
+                        captureAndSendImage();
+                    }
+                }, 30000);
             }
         }
         
@@ -269,31 +307,24 @@
                     });
                 }
             } else {
-                // Store the correct answer value for this question
-                const correctAnswerValue = q.correct_answer;
-                
-                area.innerHTML += `<div class="options" data-question-id="${q.id}" data-correct-answer="${escapeHtml(correctAnswerValue)}">
-                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option1)}" data-answer-value="${escapeHtml(q.option1)}"> A. ${escapeHtml(q.option1)}</label>
-                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option2)}" data-answer-value="${escapeHtml(q.option2)}"> B. ${escapeHtml(q.option2)}</label>
-                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option3)}" data-answer-value="${escapeHtml(q.option3)}"> C. ${escapeHtml(q.option3)}</label>
-                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option4)}" data-answer-value="${escapeHtml(q.option4)}"> D. ${escapeHtml(q.option4)}</label>
+                area.innerHTML += `<div class="options">
+                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option1)}"> A. ${escapeHtml(q.option1)}</label>
+                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option2)}"> B. ${escapeHtml(q.option2)}</label>
+                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option3)}"> C. ${escapeHtml(q.option3)}</label>
+                        <label class="option"><input type="radio" name="answer" value="${escapeHtml(q.option4)}"> D. ${escapeHtml(q.option4)}</label>
                     </div>`;
                 
-                // Add event listeners to radio buttons - store the ACTUAL ANSWER TEXT
-                document.querySelectorAll('input[name="answer"]').forEach(radio => {
-                    radio.addEventListener('change', (e) => { 
-                        const selectedAnswerText = e.target.value;
-                        answers[q.id] = selectedAnswerText;
-                        console.log(`Question ${q.id} - Selected: "${selectedAnswerText}", Correct: "${correctAnswerValue}"`);
-                        updateProgress();
-                    });
-                });
-                
-                // If answer already exists, check the correct radio
                 if (answers[q.id]) {
                     const radio = document.querySelector(`input[name="answer"][value="${escapeHtml(answers[q.id])}"]`);
                     if (radio) radio.checked = true;
                 }
+                
+                document.querySelectorAll('input[name="answer"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => { 
+                        answers[q.id] = e.target.value;
+                        updateProgress();
+                    });
+                });
             }
             
             const prevBtn = document.getElementById('prev-btn');
@@ -324,96 +355,62 @@
                 if(timerElement) timerElement.textContent = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`; 
                 if(t <= 0) { 
                     clearInterval(timerInterval); 
+                    autoSubmitReason = 'Time ran out';
                     submitExam(); 
                 } 
                 t--; 
             }, 1000);
         }
         
-        async function submitExam() {
-            clearInterval(timerInterval); 
-            stopProctoring();
-            if(document.exitFullscreen) document.exitFullscreen();
-            const btn = document.getElementById('submit-btn'); 
-            if(btn) { 
-                btn.disabled = true; 
-                btn.textContent = 'Submitting...'; 
+        function resetFullscreenExitTimer() {
+            if (fullscreenExitTimer) {
+                clearTimeout(fullscreenExitTimer);
+                fullscreenExitTimer = null;
             }
+            fullscreenExitTime = null;
+        }
+        
+        function handleFullscreenExit() {
+            if (!examStarted || !proctoringActive) return;
             
-            console.log('Submitting answers (answer text):', answers);
-            console.log('Theory answers:', theoryAnswers);
-            
-            try {
-                const res = await fetch('/submit-exam', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ 
-                        exam_code: examCode, 
-                        answers: answers,
-                        theory_answers: theoryAnswers, 
-                        attempt_id: attemptId,
-                        shuffled_questions: questions.map(q => ({ id: q.id, serial_no: q.serial_no }))
-                    }) 
-                });
-                const data = await res.json();
-                console.log('Server response:', data);
+            if (!fullscreenExitTime) {
+                fullscreenExitTime = Date.now();
+                showViolationWarning('⚠️ You exited fullscreen! Exam will auto-submit in 5 seconds if not returned.');
                 
-                const finalScoreEl = document.getElementById('final-score');
-                const totalPossibleEl = document.getElementById('total-possible');
-                const scorePercentageEl = document.getElementById('score-percentage');
-                if(finalScoreEl) finalScoreEl.textContent = data.score;
-                if(totalPossibleEl) totalPossibleEl.textContent = data.total;
-                const pct = (data.score/data.total*100).toFixed(1);
-                if(scorePercentageEl) scorePercentageEl.innerHTML = `<strong>${pct}%</strong> - ${pct>=70 ? 'Excellent!' : (pct>=50 ? 'Good!' : 'Keep Learning!')}`;
-                const resultModal = document.getElementById('result-modal');
-                if(resultModal) resultModal.style.display = 'flex';
-            } catch(e) { 
-                console.error('Submit error:', e);
-                alert('Error submitting exam. Please try again.'); 
+                fullscreenExitTimer = setTimeout(() => {
+                    if (!isFullscreen() && examStarted && proctoringActive) {
+                        autoSubmitReason = 'Exited fullscreen for more than 5 seconds';
+                        submitExam();
+                    }
+                    fullscreenExitTimer = null;
+                }, FULLSCREEN_EXIT_DELAY);
             }
         }
         
-        function closeModalAndRedirect() { 
-            window.location.href = '/student-dashboard'; 
-        }
-        
-        // Manual fullscreen button handler
-        if (fullscreenManualBtn) {
-            fullscreenManualBtn.addEventListener('click', () => {
-                enterFullscreen();
-                setTimeout(() => {
-                    if (isFullscreen()) {
-                        fullscreenManualBtn.style.display = 'none';
-                    }
-                }, 500);
-            });
+        function handleFullscreenEnter() {
+            resetFullscreenExitTimer();
         }
         
         let fullscreenEntryLogged = false;
         
         document.addEventListener('fullscreenchange', () => {
             if(!examStarted) return;
-            if(!isFullscreen() && examStarted && proctoringActive) {
-                fullscreenExitCount++;
-                if(proctoringActive) {
-                    addViolation('fullscreen_exit');
-                    showWarning('⚠️ Please stay in fullscreen mode!');
-                    if(fullscreenExitCount >= 1) {
-                        showWarning('⚠️ You exited fullscreen! Exam will be submitted.');
-                        setTimeout(() => submitExam(), 3000);
-                    } else {
-                        setTimeout(() => enterFullscreen(), 500);
-                        if (fullscreenManualBtn) fullscreenManualBtn.style.display = 'inline-flex';
-                    }
+            
+            if (!isFullscreen()) {
+                handleFullscreenExit();
+            } else {
+                handleFullscreenEnter();
+                if (!fullscreenEntryLogged) {
+                    fullscreenEntryLogged = true;
+                    if (fullscreenManualBtn) fullscreenManualBtn.style.display = 'none';
                 }
-            } else if(!fullscreenEntryLogged) {
-                fullscreenEntryLogged = true;
-                if (fullscreenManualBtn) fullscreenManualBtn.style.display = 'none';
             }
         });
         
         document.addEventListener('visibilitychange', () => { 
-            if(document.hidden && examStarted && proctoringActive) addViolation('tab_switch'); 
+            if(document.hidden && examStarted && proctoringActive) {
+                addViolation('tab_switch');
+            }
         });
         
         document.addEventListener('keydown', (e) => {
@@ -422,9 +419,6 @@
                 e.preventDefault(); 
                 if (!isFullscreen()) {
                     enterFullscreen();
-                    setTimeout(() => {
-                        if (isFullscreen() && fullscreenManualBtn) fullscreenManualBtn.style.display = 'none';
-                    }, 500);
                 }
                 return false; 
             }
@@ -435,12 +429,11 @@
                (e.altKey && e.key === 'Tab')) {
                 e.preventDefault(); 
                 addViolation('keyboard_shortcut'); 
-                showWarning('⚠️ Keyboard shortcuts are disabled!'); 
+                showViolationWarning('⚠️ Keyboard shortcuts are disabled!'); 
                 return false;
             }
         });
         
-        // Right-click is NOT recorded as violation - just prevented
         document.addEventListener('contextmenu', (e) => { 
             if(examStarted && proctoringActive) { 
                 e.preventDefault(); 
@@ -485,13 +478,10 @@
                 body: JSON.stringify({ exam_code: examCode, violation: type, image: img }) 
             });
             
-            if(violationCount >= VIOLATION_LIMIT) { 
-                showWarning('⚠️ 7 violations! Auto-submitting...'); 
-                setTimeout(() => submitExam(), 2000); 
-            }
+            showViolationWarning(`⚠️ Violation detected: ${type}`);
         }
         
-        function showWarning(msg) { 
+        function showViolationWarning(msg) { 
             const w = document.createElement('div'); 
             w.className = 'violation-warning'; 
             w.innerHTML = msg; 
@@ -533,7 +523,9 @@
                             if(diff > 80) changed++;
                             total++;
                         }
-                        if(changed / total > 0.3) addViolation('excessive_movement');
+                        if(changed / total > 0.3) {
+                            addViolation('excessive_movement');
+                        }
                     }
                     lastFrame = current;
                 }
@@ -542,8 +534,74 @@
         
         function stopProctoring() {
             proctoringActive = false;
+            resetFullscreenExitTimer();
             if(motionInterval) { clearInterval(motionInterval); motionInterval = null; }
             if(stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        }
+        
+        async function submitExam() {
+            clearInterval(timerInterval); 
+            stopProctoring();
+            if(document.exitFullscreen) document.exitFullscreen();
+            const btn = document.getElementById('submit-btn'); 
+            if(btn) { 
+                btn.disabled = true; 
+                btn.textContent = 'Submitting...'; 
+            }
+            
+            try {
+                const res = await fetch('/submit-exam', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        exam_code: examCode, 
+                        answers: answers,
+                        theory_answers: theoryAnswers, 
+                        attempt_id: attemptId,
+                        shuffled_questions: questions.map(q => ({ id: q.id, serial_no: q.serial_no })),
+                        auto_submit_reason: autoSubmitReason
+                    }) 
+                });
+                const data = await res.json();
+                
+                const finalScoreEl = document.getElementById('final-score');
+                const totalPossibleEl = document.getElementById('total-possible');
+                const scorePercentageEl = document.getElementById('score-percentage');
+                const violationResultEl = document.getElementById('violation-result');
+                const autoSubmitReasonEl = document.getElementById('auto-submit-reason');
+                
+                if(finalScoreEl) finalScoreEl.textContent = data.score;
+                if(totalPossibleEl) totalPossibleEl.textContent = data.total;
+                const pct = (data.score/data.total*100).toFixed(1);
+                if(scorePercentageEl) scorePercentageEl.innerHTML = `<strong>${pct}%</strong> - ${pct>=70 ? 'Excellent!' : (pct>=50 ? 'Good!' : 'Keep Learning!')}`;
+                if(violationResultEl && data.violation_count) {
+                    violationResultEl.innerHTML = `⚠️ Violations recorded: ${data.violation_count}`;
+                }
+                if(autoSubmitReasonEl && autoSubmitReason) {
+                    autoSubmitReasonEl.innerHTML = `📌 Auto-submit reason: ${autoSubmitReason}`;
+                }
+                
+                const resultModal = document.getElementById('result-modal');
+                if(resultModal) resultModal.style.display = 'flex';
+            } catch(e) { 
+                console.error('Submit error:', e);
+                alert('Error submitting exam. Please try again.'); 
+            }
+        }
+        
+        function closeModalAndRedirect() { 
+            window.location.href = '/student-dashboard'; 
+        }
+        
+        if (fullscreenManualBtn) {
+            fullscreenManualBtn.addEventListener('click', () => {
+                enterFullscreen();
+                setTimeout(() => {
+                    if (isFullscreen()) {
+                        fullscreenManualBtn.style.display = 'none';
+                    }
+                }, 500);
+            });
         }
         
         const prevBtn = document.getElementById('prev-btn');
@@ -597,7 +655,6 @@
             } 
         });
         
-        // Start the exam with countdown
         startCountdown();
     </script>
 {% else %}

@@ -1,9 +1,9 @@
-<!-- templates/pro_result_pdf.html - Complete Fixed Version -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Student Transcript - {{ student.name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <style>
         * {
             margin: 0;
@@ -16,6 +16,34 @@
             background: white;
             color: #1f2937;
             line-height: 1.5;
+            position: relative;
+        }
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.1;
+            z-index: 0;
+            pointer-events: none;
+            text-align: center;
+        }
+        .watermark img {
+            max-width: 300px;
+            max-height: 300px;
+            width: auto;
+            height: auto;
+        }
+        .watermark-text {
+            font-size: 48px;
+            font-weight: bold;
+            color: #f97316;
+            white-space: nowrap;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+            background: white;
         }
         .school-header {
             text-align: center;
@@ -89,6 +117,19 @@
         }
         .results-table tr:nth-child(even) {
             background: #fef9f0;
+        }
+        .score-cell {
+            font-weight: 500;
+        }
+        .obj-score {
+            color: #10b981;
+        }
+        .theory-score {
+            color: #f97316;
+        }
+        .total-score {
+            font-weight: bold;
+            color: #1f2937;
         }
         .grade-A {
             color: #10b981;
@@ -166,7 +207,14 @@
             font-size: 12px;
             color: #f97316;
         }
+        .empty-score {
+            color: #9ca3af;
+            font-style: italic;
+        }
         @media print {
+            .watermark {
+                opacity: 0.15;
+            }
             body {
                 padding: 20px;
             }
@@ -174,106 +222,189 @@
     </style>
 </head>
 <body>
-    <div class="print-date">
-        🍯 Generated: {{ current_date }}
-    </div>
-    
-    <div class="school-header">
-        {% if settings and settings.get('logo') %}
-        <img src="{{ settings.logo }}" alt="School Logo" class="school-logo">
-        {% endif %}
-        <div class="school-name">
-            {{ settings.school_name if settings and settings.get('school_name') else 'GINT Hive CBT School' }}
-        </div>
-        <div class="school-address">
-            {{ settings.address if settings and settings.get('address') else 'Education Excellence Center, Learning City' }}
-        </div>
-        <div class="school-motto">
-            🍯 "Empowering Minds, Building Futures" 🍯
-        </div>
-    </div>
-    
-    <div class="document-title">
-        Academic Transcript
-    </div>
-    
-    <div class="student-info">
-        <p><span class="info-label">👤 Student Name:</span> {{ student.name }}</p>
-        <p><span class="info-label">🆔 Student ID:</span> {{ student.student_id }}</p>
-        <p><span class="info-label">🏫 Class:</span> {{ student.class_id }}</p>
-        <p><span class="info-label">📅 Session:</span> {{ student.session }}</p>
-    </div>
-    
-    <table class="results-table">
-        <thead>
-            <tr><th>S/N</th><th>Exam Title</th><th>Exam Code</th><th>Score</th><th>Total</th><th>Percentage</th><th>Grade</th></thead>
-        <tbody>
-            {% for result in results %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td><strong>{{ result.exam_title }}</strong></td>
-                <td>{{ result.exam_code }}</td>
-                <td>{{ result.score }}</td>
-                <td>{{ result.total_possible }}</td>
-                {% set percentage = (result.score / result.total_possible * 100) if result.total_possible > 0 else 0 %}
-                <td>{{ "%.1f"|format(percentage) }}%</td>
-                <td>{% if percentage >= 70 %}<span class="grade-A">🎉 A (Excellent)</span>{% elif percentage >= 60 %}<span class="grade-B">👍 B (Very Good)</span>{% elif percentage >= 50 %}<span class="grade-C">📚 C (Good)</span>{% elif percentage >= 45 %}<span class="grade-D">📖 D (Pass)</span>{% else %}<span class="grade-F">💪 F (Needs Improvement)</span>{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="7" style="text-align: center;">📭 No examination records found</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    
-    {% if results %}
-    {% set percentages = [] %}
-    {% for result in results %}
-        {% set p = (result.score / result.total_possible * 100) if result.total_possible > 0 else 0 %}
-        {% set _ = percentages.append(p) %}
-    {% endfor %}
-    <div class="summary-stats">
-        <h4 style="color: #f97316;">📊 Academic Summary</h4>
-        <p><strong>📈 Average Score:</strong> {{ "%.1f"|format(percentages|sum / percentages|length) }}%</p>
-        <p><strong>🏆 Highest Score:</strong> {{ "%.1f"|format(percentages|max) }}%</p>
-        <p><strong>📚 Lowest Score:</strong> {{ "%.1f"|format(percentages|min) }}%</p>
-        <p><strong>✅ Total Exams Taken:</strong> {{ results|length }}</p>
-    </div>
-    
-    {% set avg = percentages|sum / percentages|length if percentages else 0 %}
-    <div class="remarks">
-        <strong>🍯 Principal's Remarks:</strong><br>
-        {% if avg >= 80 %}
-        🌟 <strong>Outstanding Achievement!</strong> Dear {{ student.name }}, your performance is truly exceptional! You have demonstrated mastery across all subjects. Your dedication and hard work are evident in these results. Keep reaching for the stars! You make us proud! 🎉
-        {% elif avg >= 70 %}
-        🎉 <strong>Excellent Performance!</strong> Dear {{ student.name }}, you've done wonderfully well! Your scores reflect a strong understanding of your studies. With continued focus, you'll achieve even greater heights. We're proud of you! 👏
-        {% elif avg >= 60 %}
-        👍 <strong>Very Good Work!</strong> Dear {{ student.name }}, you've shown solid understanding across your subjects. Your consistent effort is paying off. A little extra practice on challenging topics will make your results even better! Keep going! 💪
-        {% elif avg >= 50 %}
-        📚 <strong>Good Progress!</strong> Dear {{ student.name }}, you've successfully completed your exams with satisfactory results. Every step forward counts! Keep building on this foundation, and don't hesitate to ask for help when needed. You're on the right track! 🌱
-        {% elif avg >= 45 %}
-        💪 <strong>You're on the Right Track!</strong> Dear {{ student.name }}, these results show you have grasped the basics. Remember, learning is a journey. With more focus and practice, you can definitely improve. I believe in your potential! You can do this! ⭐
+    <!-- Watermark with fallback -->
+    <div class="watermark">
+        {% if logo_path and logo_path != '' and logo_path != 'None' and logo_path != 'null' %}
+            <img src="{{ logo_path }}" alt="School Logo" onerror="this.src='{{ url_for('static', filename='logo.png') }}'; this.onerror=null;">
         {% else %}
-        🌱 <strong>Room to Grow!</strong> Dear {{ student.name }}, everyone learns at their own pace. This is an opportunity to identify areas for improvement. I encourage you to review your work, ask questions, and practice more. Success comes to those who persist! Never give up! 🚀
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Default Logo">
         {% endif %}
-        <div class="encouragement">💡 "Believe you can and you're halfway there." - Theodore Roosevelt</div>
-    </div>
-    {% endif %}
-    
-    <div class="signature-section">
-        <div class="signature-line"><div>_________________________</div><div class="signature-name">{{ settings.principal_name if settings and settings.get('principal_name') else 'School Principal' }}</div><div class="signature-title">Principal</div></div>
-        <div class="signature-line"><div>_________________________</div><div class="signature-name">{{ settings.registrar_name if settings and settings.get('registrar_name') else 'Academic Registrar' }}</div><div class="signature-title">Registrar</div></div>
-        <div class="signature-line"><div>_________________________</div><div class="signature-name">Student's Signature</div><div class="signature-title">Student</div></div>
     </div>
     
-    <div class="school-seal">
-        🍯 Official Academic Transcript • GINT Hive CBT 🍯
-    </div>
-    
-    <div class="footer">
-        <p>This is an official academic transcript issued by GINT Hive CBT.</p>
-        <p>For verification, please contact the school administration.</p>
-        <p>© {{ current_date[:4] }} GINT Hive CBT - Empowering Education Through Technology</p>
-        <p style="margin-top: 5px;">🔒 Proctored & Secure Examination System</p>
+    <div class="content">
+        <div class="print-date">
+            🍯 Generated: {{ current_date }}
+        </div>
+        
+        <div class="school-header">
+            {% if settings and settings.get('logo') and settings.logo != '' %}
+            <img src="{{ settings.logo }}" alt="School Logo" class="school-logo" onerror="this.src='{{ url_for('static', filename='logo.png') }}'; this.onerror=null;">
+            {% else %}
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="School Logo" class="school-logo">
+            {% endif %}
+            <div class="school-name">
+                {{ settings.school_name if settings and settings.get('school_name') else 'GINT Hive CBT School' }}
+            </div>
+            <div class="school-address">
+                {{ settings.address if settings and settings.get('address') else 'Education Excellence Center, Learning City' }}
+            </div>
+            <div class="school-motto">
+                🍯 "Empowering Minds, Building Futures" 🍯
+            </div>
+        </div>
+        
+        <div class="document-title">
+            Academic Transcript
+        </div>
+        
+        <div class="student-info">
+            <p><span class="info-label">👤 Student Name:</span> {{ student.name }}</p>
+            <p><span class="info-label">🆔 Student ID:</span> {{ student.student_id }}</p>
+            <p><span class="info-label">🏫 Class:</span> {{ student.class_id }}</p>
+            <p><span class="info-label">📅 Session:</span> {{ student.session }}</p>
+        </div>
+        
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>S/N</th>
+                    <th>Subject</th>
+                    <th>Exam Code</th>
+                    <th>Objective Score</th>
+                    <th>Theory Score</th>
+                    <th>Total Score</th>
+                    <th>Max Score</th>
+                    <th>Percentage</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set merged_results = {} %}
+                {% for result in results %}
+                    {% set subject_key = result.subject_code %}
+                    {% set exam_code = result.exam_code %}
+                    {% set obj_info = obj_scores.get(exam_code, {'score': 0, 'total': 0}) %}
+                    {% set theory_info = theory_scores.get(exam_code, {'score': 0, 'total': 0}) %}
+                    
+                    {% if merged_results[subject_key] is not defined %}
+                        {% set _ = merged_results.update({subject_key: {
+                            'exam_code': exam_code,
+                            'subject_name': result.subject_name or result.subject_code,
+                            'obj_score': obj_info.score,
+                            'obj_total': obj_info.total,
+                            'theory_score': theory_info.score,
+                            'theory_total': theory_info.total,
+                            'exam_title': result.exam_title
+                        }}) %}
+                    {% else %}
+                        {% set existing = merged_results[subject_key] %}
+                        {% set _ = merged_results.update({subject_key: {
+                            'exam_code': existing.exam_code,
+                            'subject_name': existing.subject_name,
+                            'obj_score': existing.obj_score + obj_info.score,
+                            'obj_total': existing.obj_total + obj_info.total,
+                            'theory_score': existing.theory_score + theory_info.score,
+                            'theory_total': existing.theory_total + theory_info.total,
+                            'exam_title': existing.exam_title
+                        }}) %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% set counter = namespace(value=1) %}
+                {% for subject_key, data in merged_results.items() %}
+                    {% set total_score = data.obj_score + data.theory_score %}
+                    {% set total_possible = data.obj_total + data.theory_total %}
+                    {% set percentage = (total_score / total_possible * 100) if total_possible > 0 else 0 %}
+                    <tr>
+                        <td>{{ counter.value }}</td>
+                        <td><strong>{{ data.subject_name }}</strong></td>
+                        <td><code>{{ data.exam_code }}</code></td>
+                        <td class="score-cell">
+                            {% if data.obj_total > 0 %}
+                                <span class="obj-score">{{ data.obj_score }}/{{ data.obj_total }}</span>
+                            {% else %}
+                                <span class="empty-score">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="score-cell">
+                            {% if data.theory_total > 0 %}
+                                <span class="theory-score">{{ data.theory_score }}/{{ data.theory_total }}</span>
+                            {% else %}
+                                <span class="empty-score">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="total-score">{{ total_score }}</td>
+                        <td class="total-score">{{ total_possible }}</td>
+                        <td>{{ "%.1f"|format(percentage) }}%</td>
+                        <td>
+                            {% if percentage >= 70 %}<span class="grade-A">🎉 A (Excellent)</span>
+                            {% elif percentage >= 60 %}<span class="grade-B">👍 B (Very Good)</span>
+                            {% elif percentage >= 50 %}<span class="grade-C">📚 C (Good)</span>
+                            {% elif percentage >= 45 %}<span class="grade-D">📖 D (Pass)</span>
+                            {% else %}<span class="grade-F">💪 F (Needs Improvement)</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% set counter.value = counter.value + 1 %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center;">📭 No examination records found</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if merged_results %}
+        {% set percentages = [] %}
+        {% for subject_key, data in merged_results.items() %}
+            {% set total_score = data.obj_score + data.theory_score %}
+            {% set total_possible = data.obj_total + data.theory_total %}
+            {% set p = (total_score / total_possible * 100) if total_possible > 0 else 0 %}
+            {% set _ = percentages.append(p) %}
+        {% endfor %}
+        <div class="summary-stats">
+            <h4 style="color: #f97316;">📊 Academic Summary</h4>
+            <p><strong>📈 Average Score:</strong> {{ "%.1f"|format(percentages|sum / percentages|length) }}%</p>
+            <p><strong>🏆 Highest Score:</strong> {{ "%.1f"|format(percentages|max) }}%</p>
+            <p><strong>📚 Lowest Score:</strong> {{ "%.1f"|format(percentages|min) }}%</p>
+            <p><strong>✅ Subjects Taken:</strong> {{ merged_results|length }}</p>
+        </div>
+        
+        {% set avg = percentages|sum / percentages|length if percentages else 0 %}
+        <div class="remarks">
+            <strong>🍯 Principal's Remarks:</strong><br>
+            {% if avg >= 80 %}
+            🌟 <strong>Outstanding Achievement!</strong> Dear {{ student.name }}, your performance is truly exceptional! You have demonstrated mastery across all subjects. Your dedication and hard work are evident in these results. Keep reaching for the stars! You make us proud! 🎉
+            {% elif avg >= 70 %}
+            🎉 <strong>Excellent Performance!</strong> Dear {{ student.name }}, you've done wonderfully well! Your scores reflect a strong understanding of your studies. With continued focus, you'll achieve even greater heights. We're proud of you! 👏
+            {% elif avg >= 60 %}
+            👍 <strong>Very Good Work!</strong> Dear {{ student.name }}, you've shown solid understanding across your subjects. Your consistent effort is paying off. A little extra practice on challenging topics will make your results even better! Keep going! 💪
+            {% elif avg >= 50 %}
+            📚 <strong>Good Progress!</strong> Dear {{ student.name }}, you've successfully completed your exams with satisfactory results. Every step forward counts! Keep building on this foundation, and don't hesitate to ask for help when needed. You're on the right track! 🌱
+            {% elif avg >= 45 %}
+            💪 <strong>You're on the Right Track!</strong> Dear {{ student.name }}, these results show you have grasped the basics. Remember, learning is a journey. With more focus and practice, you can definitely improve. I believe in your potential! You can do this! ⭐
+            {% else %}
+            🌱 <strong>Room to Grow!</strong> Dear {{ student.name }}, everyone learns at their own pace. This is an opportunity to identify areas for improvement. I encourage you to review your work, ask questions, and practice more. Success comes to those who persist! Never give up! 🚀
+            {% endif %}
+            <div class="encouragement">💡 "Believe you can and you're halfway there." - Theodore Roosevelt</div>
+        </div>
+        {% endif %}
+        
+        <div class="signature-section">
+            <div class="signature-line"><div>_________________________</div><div class="signature-name">{{ settings.principal_name if settings and settings.get('principal_name') else 'School Principal' }}</div><div class="signature-title">Principal</div></div>
+            <div class="signature-line"><div>_________________________</div><div class="signature-name">{{ settings.registrar_name if settings and settings.get('registrar_name') else 'Academic Registrar' }}</div><div class="signature-title">Registrar</div></div>
+            <div class="signature-line"><div>_________________________</div><div class="signature-name">Student's Signature</div><div class="signature-title">Student</div></div>
+        </div>
+        
+        <div class="school-seal">
+            🍯 Official Academic Transcript • GINT Hive CBT 🍯
+        </div>
+        
+        <div class="footer">
+            <p>This is an official academic transcript issued by GINT Hive CBT.</p>
+            <p>For verification, please contact the school administration.</p>
+            <p>© {{ current_date[:4] }} GINT Hive CBT - Empowering Education Through Technology</p>
+            <p style="margin-top: 5px;">🔒 Proctored & Secure Examination System</p>
+        </div>
     </div>
 </body>
 </html>

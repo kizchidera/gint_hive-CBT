@@ -68,26 +68,34 @@
         }
         
         .btn-template {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            padding: 0.5rem 1rem;
-            border: 1px solid var(--border-light);
-            border-radius: 0.5rem;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: white;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 0.75rem;
             cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 500;
+            font-size: 0.8rem;
+            font-weight: 600;
             transition: all var(--transition-fast) ease;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .btn-template:hover {
-            background: var(--primary-500);
-            color: white;
-            border-color: var(--primary-500);
             transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            filter: brightness(1.05);
+        }
+        
+        .btn-template.objective {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+        
+        .btn-template.theory {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
         }
         
         .class-filter {
@@ -116,7 +124,7 @@
         }
         
         .download-pdf-btn {
-            background: var(--primary-500);
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
@@ -131,8 +139,8 @@
         }
         
         .download-pdf-btn:hover {
-            background: var(--primary-600);
             transform: translateY(-2px);
+            filter: brightness(1.05);
         }
         
         .student-table-container {
@@ -207,24 +215,396 @@
             background: #059669;
         }
         
-        .edit-student-icon {
+        .assignment-popup {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideInRight 0.3s ease, fadeOut 3s ease forwards;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+        
+        .current-password-field {
+            background: var(--bg-tertiary);
+            cursor: not-allowed;
+            font-family: monospace;
+        }
+        
+        .btn-small {
+            padding: 0.375rem 0.875rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: var(--primary-500);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
             cursor: pointer;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.375rem;
-            background: var(--primary-50);
-            color: var(--primary-600);
             transition: all var(--transition-fast) ease;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
-            font-size: 0.75rem;
         }
         
-        .edit-student-icon:hover {
+        .btn-small:hover {
+            background: var(--primary-600);
+            transform: translateY(-1px);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.625rem 1.25rem;
+            border: 1px solid var(--border-light);
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .btn-secondary:hover {
             background: var(--primary-500);
             color: white;
+            border-color: var(--primary-500);
             transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: white;
+            border: none;
+            border-radius: 1rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all var(--transition-fast) ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .input-group {
+            margin-bottom: 1.25rem;
+            position: relative;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 1.5px solid var(--border-light);
+            border-radius: 1rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: inherit;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .input-group input:focus,
+        .input-group select:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .collapsible-section {
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-light);
+            border-radius: 1.25rem;
+            overflow: hidden;
+            background: var(--bg-card);
+            transition: all var(--transition-base) ease;
+        }
+        
+        .collapsible-header {
+            background: var(--bg-tertiary);
+            padding: 1.25rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .collapsible-header:hover {
+            background: var(--primary-50);
+        }
+        
+        .dark-theme .collapsible-header:hover {
+            background: rgba(249, 115, 22, 0.1);
+        }
+        
+        .collapsible-header h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.125rem;
+        }
+        
+        .collapsible-icon {
+            font-size: 1rem;
+            transition: transform var(--transition-fast) ease;
+            color: var(--text-muted);
+        }
+        
+        .collapsible-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .collapsible-content {
+            max-height: 2000px;
+            overflow: hidden;
+            transition: max-height var(--transition-base) ease;
+            padding: 1.5rem;
+        }
+        
+        .collapsible-content.collapsed {
+            max-height: 0;
+            padding: 0 1.5rem;
+        }
+        
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-btn {
+            background: var(--primary-500);
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .dropdown-btn:hover {
+            background: var(--primary-600);
+            transform: translateY(-2px);
+        }
+        
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: var(--bg-secondary);
+            min-width: 200px;
+            box-shadow: var(--shadow-lg);
+            border-radius: 0.75rem;
+            z-index: 100;
+            border: 1px solid var(--border-light);
+            overflow: hidden;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .dropdown-content a,
+        .dropdown-content button {
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .dropdown-content a:hover,
+        .dropdown-content button:hover {
+            background-color: var(--bg-tertiary);
+        }
+        
+        .dropdown-content .danger {
+            color: var(--danger);
+        }
+        
+        .dropdown-content .danger:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+        
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal-content {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            animation: scaleIn 0.3s ease;
+        }
+        
+        .modal-content-large {
+            max-width: 800px;
+        }
+        
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all var(--transition-fast) ease;
+        }
+        
+        .close:hover {
+            background: var(--bg-tertiary);
+            color: var(--danger);
+        }
+        
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 1rem;
+            margin-bottom: 1rem;
+            animation: slideDown 0.4s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .alert-success {
+            background: var(--success-light);
+            color: var(--success);
+            border-left: 4px solid var(--success);
+        }
+        
+        .alert-error {
+            background: var(--danger-light);
+            color: var(--danger);
+            border-left: 4px solid var(--danger);
+        }
+        
+        .alert-warning {
+            background: var(--warning-light);
+            color: var(--warning);
+            border-left: 4px solid var(--warning);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 0.875rem;
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .data-table td {
+            padding: 0.875rem;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.875rem;
+        }
+        
+        .data-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        hr {
+            margin: 1rem 0;
+            border-color: var(--border-light);
         }
     </style>
 </head>
@@ -293,7 +673,8 @@
                     <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
                         <table class="data-table">
                             <thead>
-                                <tr><th>Subject Code</th><th>Subject Name</th><th>Description</th><th>Actions</th></thead>
+                                么<th>Subject Code</th><th>Subject Name</th><th>Description</th><th>Actions</th>
+                            </thead>
                             <tbody>
                                 {% for subject in subjects %}
                                 <tr>
@@ -312,11 +693,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📚</div>
-                        <h4>No Subjects Yet</h4>
-                        <p>Create your first subject using the button above.</p>
-                    </div>
+                    <div class="empty-state"><div class="empty-state-icon">📚</div><h4>No Subjects Yet</h4><p>Create your first subject using the button above.</p></div>
                     {% endif %}
                 </div>
             </div>
@@ -336,7 +713,6 @@
                         {% endif %}
                     </div>
                     
-                    <!-- Class Filter and Download -->
                     <div class="class-filter">
                         <label>📋 Filter by Class:</label>
                         <select id="classFilter" onchange="filterStudentsByClass()">
@@ -352,7 +728,7 @@
                     <div class="student-table-container">
                         <table class="data-table" id="studentsTable">
                             <thead>
-                                <tr><th>ID</th><th>Name</th><th>Class</th><th>Session</th><th>Actions</th></tr>
+                                么<th>ID</th><th>Name</th><th>Class</th><th>Session</th><th>Actions</th>
                             </thead>
                             <tbody id="studentsTableBody">
                                 {% for student in students %}
@@ -374,11 +750,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">👥</div>
-                        <h4>No Students Yet</h4>
-                        <p>Add students individually or bulk upload via CSV.</p>
-                    </div>
+                    <div class="empty-state"><div class="empty-state-icon">👥</div><h4>No Students Yet</h4><p>Add students individually or bulk upload via CSV.</p></div>
                     {% endif %}
                 </div>
             </div>
@@ -398,7 +770,7 @@
                     </div>
                     
                     <div class="template-buttons">
-                        <span style="font-size: 0.75rem; color: var(--text-muted);">📥 Download Templates:</span>
+                        <span style="font-size: 0.875rem; color: var(--text-muted);">📥 Download Templates:</span>
                         <a href="{{ url_for('download_csv_template', type='questions') }}" class="btn-template objective">🎯 Objective Template</a>
                         <a href="{{ url_for('download_theory_template') }}" class="btn-template theory">✍️ Theory Template</a>
                     </div>
@@ -407,7 +779,7 @@
                     <div style="overflow-x: auto;">
                         <table class="data-table">
                             <thead>
-                                <tr>
+                                么
                                     <th>Title</th>
                                     <th>Code</th>
                                     <th>Subject</th>
@@ -416,8 +788,7 @@
                                     <th>Timer</th>
                                     <th>Status</th>
                                     <th>Actions</th>
-                                </tr>
-                            </thead>
+                                </thead>
                             <tbody>
                                 {% for exam in exams %}
                                 <tr>
@@ -482,11 +853,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📝</div>
-                        <h4>No Exams Yet</h4>
-                        <p>Create your first exam using the button above.</p>
-                    </div>
+                    <div class="empty-state"><div class="empty-state-icon">📝</div><h4>No Exams Yet</h4><p>Create your first exam using the button above.</p></div>
                     {% endif %}
                 </div>
             </div>
@@ -534,7 +901,7 @@
                 <div class="input-group">
                     <label>Subject Code</label>
                     <input type="text" name="subject_code" placeholder="e.g., MATH101" required>
-                    <small style="color: var(--text-muted);">Unique identifier for the subject</small>
+                    <small>Unique identifier for the subject</small>
                 </div>
                 <div class="input-group">
                     <label>Subject Name</label>
@@ -595,7 +962,7 @@
         </div>
     </div>
     
-    <!-- Edit Student Modal -->
+    <!-- Edit Student Modal with Visible Password -->
     <div id="editStudentModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('editStudentModal')">&times;</span>
@@ -605,7 +972,7 @@
                 <div class="input-group">
                     <label>Student ID</label>
                     <input type="text" name="student_id" id="edit_student_id_value" required>
-                    <small style="color: var(--text-muted);">Unique identifier for the student</small>
+                    <small>Unique identifier for the student</small>
                 </div>
                 <div class="input-group">
                     <label>Full Name</label>
@@ -620,9 +987,14 @@
                     <input type="text" name="session" id="edit_student_session" placeholder="e.g., 2024/2025" required>
                 </div>
                 <div class="input-group">
+                    <label>Current Password</label>
+                    <input type="text" id="edit_student_current_password" class="current-password-field" readonly>
+                    <small>Current password for reference</small>
+                </div>
+                <div class="input-group">
                     <label>New Password</label>
                     <input type="password" name="password" placeholder="Leave blank to keep current password">
-                    <small style="color: var(--text-muted);">Only enter if you want to change the password</small>
+                    <small>Only enter if you want to change the password</small>
                 </div>
                 <button type="submit" class="btn-primary">Update Student</button>
             </form>
@@ -692,7 +1064,7 @@
                 <div class="input-group">
                     <label>Questions CSV File</label>
                     <input type="file" name="questions_csv" accept=".csv" required>
-                    <small style="color: var(--text-muted);">Use Objective Template or Theory Template format</small>
+                    <small>Use Objective Template or Theory Template format</small>
                 </div>
                 <div class="input-group">
                     <label>Upload Mode</label>
@@ -700,13 +1072,13 @@
                         <option value="new">Add New Questions</option>
                         <option value="replace">Replace Existing Questions</option>
                     </select>
-                    <small style="color: var(--text-muted);">"Replace" will delete existing questions before uploading new ones</small>
+                    <small>"Replace" will delete existing questions before uploading new ones</small>
                 </div>
                 <button type="submit" class="btn-primary">Upload Questions</button>
             </form>
             <hr>
             <div class="template-buttons" style="margin-top: 1rem;">
-                <span style="font-size: 0.75rem; color: var(--text-muted);">📥 Need templates?</span>
+                <span>📥 Need templates?</span>
                 <a href="{{ url_for('download_csv_template', type='questions') }}" class="btn-template objective">🎯 Objective Template</a>
                 <a href="{{ url_for('download_theory_template') }}" class="btn-template theory">✍️ Theory Template</a>
             </div>
@@ -812,7 +1184,7 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('assignExamModal')">&times;</span>
             <h3>Assign Exam to Students</h3>
-            <form method="POST" id="assignExamForm" action="{{ url_for('assign_exam') }}">
+            <form method="POST" id="assignExamForm">
                 <input type="hidden" name="exam_code" id="assign_exam_code">
                 <div class="input-group">
                     <label>Assignment Type</label>
@@ -882,11 +1254,19 @@
             }
         });
         
+        // Assignment Success Popup
+        function showAssignmentSuccessPopup(message) {
+            const popup = document.createElement('div');
+            popup.className = 'assignment-popup';
+            popup.innerHTML = `✅ ${message}`;
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 3000);
+        }
+        
         // Student filter function
         function filterStudentsByClass() {
             const selectedClass = document.getElementById('classFilter').value;
             const rows = document.querySelectorAll('#studentsTableBody tr');
-            
             rows.forEach(row => {
                 if (selectedClass === 'all' || row.dataset.class === selectedClass) {
                     row.style.display = '';
@@ -908,7 +1288,6 @@
             }
         }
         
-        // Edit Student function
         async function editStudent(studentId) {
             try {
                 const response = await fetch(`/get-student/${studentId}`);
@@ -920,13 +1299,17 @@
                 document.getElementById('edit_student_class').value = student.class_id;
                 document.getElementById('edit_student_session').value = student.session;
                 
+                const currentPasswordInput = document.getElementById('edit_student_current_password');
+                if (currentPasswordInput) {
+                    currentPasswordInput.value = student.plain_password || 'No password set';
+                }
+                
                 showModal('editStudentModal');
             } catch (error) {
                 alert('Error loading student details');
             }
         }
         
-        // Edit Student Form Submit
         const editStudentForm = document.getElementById('editStudentForm');
         if (editStudentForm) {
             editStudentForm.onsubmit = function(e) {
@@ -937,7 +1320,6 @@
             };
         }
         
-        // Question upload form handler
         const questionUploadForm = document.getElementById('questionUploadForm');
         if (questionUploadForm) {
             questionUploadForm.onsubmit = function(e) {
@@ -976,22 +1358,19 @@
         }
         
         function showEditExamModal(examId) {
-            fetch(`/get-exam/${examId}`)
-                .then(r => r.json())
-                .then(exam => {
-                    document.getElementById('edit_exam_id').value = exam.id;
-                    document.getElementById('edit_exam_title').value = exam.exam_title;
-                    document.getElementById('edit_exam_code').value = exam.exam_code;
-                    document.getElementById('edit_subject_code_select').value = exam.subject_code || '';
-                    document.getElementById('edit_exam_date').value = exam.exam_date;
-                    document.getElementById('edit_exam_time').value = exam.exam_time;
-                    document.getElementById('edit_timer_minutes').value = exam.timer_minutes;
-                    document.getElementById('edit_class_id').value = exam.class_id;
-                    document.getElementById('edit_exam_type').value = exam.exam_type || 'objective';
-                    document.getElementById('edit_instructions').value = exam.instructions || '';
-                    showModal('editExamModal');
-                })
-                .catch(err => alert('Error loading exam details: ' + err.message));
+            fetch(`/get-exam/${examId}`).then(r => r.json()).then(exam => {
+                document.getElementById('edit_exam_id').value = exam.id;
+                document.getElementById('edit_exam_title').value = exam.exam_title;
+                document.getElementById('edit_exam_code').value = exam.exam_code;
+                document.getElementById('edit_subject_code_select').value = exam.subject_code || '';
+                document.getElementById('edit_exam_date').value = exam.exam_date;
+                document.getElementById('edit_exam_time').value = exam.exam_time;
+                document.getElementById('edit_timer_minutes').value = exam.timer_minutes;
+                document.getElementById('edit_class_id').value = exam.class_id;
+                document.getElementById('edit_exam_type').value = exam.exam_type || 'objective';
+                document.getElementById('edit_instructions').value = exam.instructions || '';
+                showModal('editExamModal');
+            }).catch(err => alert('Error loading exam details: ' + err.message));
         }
         
         const editExamForm = document.getElementById('editExamForm');
@@ -1005,55 +1384,49 @@
         }
         
         function editQuestions(examCode) {
-            fetch(`/get-questions/${examCode}`)
-                .then(r => r.json())
-                .then(data => {
-                    const editor = document.getElementById('questionsEditor');
-                    if (data.questions && data.questions.length > 0) {
-                        let html = '<div style="overflow-x: auto;"><table class="data-table"><thead><th>#</th><th>Question</th><th>Type</th><th>Answer</th><th>Score</th><th>Actions</th></thead><tbody>';
-                        data.questions.forEach(q => {
-                            const isTheory = !q.option1 && !q.option2 && !q.option3 && !q.option4;
-                            html += `<tr>
-                                <td>${q.serial_no}</td>
-                                <td>${q.question.substring(0, 60)}${q.question.length > 60 ? '...' : ''}</td>
-                                <td>${isTheory ? '📝 Theory' : '🎯 Objective'}</td>
-                                <td>${q.correct_answer.substring(0, 30)}${q.correct_answer.length > 30 ? '...' : ''}</td>
-                                <td>${q.score}</td>
-                                <td class="action-buttons">
-                                    <button class="btn-small" onclick="editSingleQuestion(${q.id})">✏️ Edit</button>
-                                    <form method="POST" action="{{ url_for('delete_question', question_id=0) }}".replace('0', ${q.id}) style="display: inline;" onsubmit="return confirm('Delete this question?')">
-                                        <button type="submit" class="btn-small btn-danger">🗑️ Delete</button>
-                                    </form>
-                                </td>
-                            </tr>`;
-                        });
-                        html += '</tbody></table></div>';
-                        editor.innerHTML = html;
-                    } else {
-                        editor.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❓</div><h4>No Questions Found</h4><p>Upload questions for this exam using the CSV upload option.</p></div>';
-                    }
-                    showModal('editQuestionsModal');
-                })
-                .catch(err => alert('Error loading questions: ' + err.message));
+            fetch(`/get-questions/${examCode}`).then(r => r.json()).then(data => {
+                const editor = document.getElementById('questionsEditor');
+                if (data.questions && data.questions.length > 0) {
+                    let html = '<div style="overflow-x: auto;"><table class="data-table"><thead><th>#</th><th>Question</th><th>Type</th><th>Answer</th><th>Score</th><th>Actions</th></thead><tbody>';
+                    data.questions.forEach(q => {
+                        const isTheory = !q.option1 && !q.option2 && !q.option3 && !q.option4;
+                        html += `<tr>
+                            <td>${q.serial_no}</td>
+                            <td>${q.question.substring(0, 60)}${q.question.length > 60 ? '...' : ''}</td>
+                            <td>${isTheory ? '📝 Theory' : '🎯 Objective'}</td>
+                            <td>${q.correct_answer.substring(0, 30)}${q.correct_answer.length > 30 ? '...' : ''}</td>
+                            <td>${q.score}</td>
+                            <td class="action-buttons">
+                                <button class="btn-small" onclick="editSingleQuestion(${q.id})">✏️ Edit</button>
+                                <form method="POST" action="{{ url_for('delete_question', question_id=0) }}".replace('0', ${q.id}) style="display: inline;" onsubmit="return confirm('Delete this question?')">
+                                    <button type="submit" class="btn-small btn-danger">🗑️ Delete</button>
+                                </form>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                    editor.innerHTML = html;
+                } else {
+                    editor.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❓</div><h4>No Questions Found</h4><p>Upload questions for this exam using the CSV upload option.</p></div>';
+                }
+                showModal('editQuestionsModal');
+            }).catch(err => alert('Error loading questions: ' + err.message));
         }
         
         function editSingleQuestion(questionId) {
-            fetch(`/get-question/${questionId}`)
-                .then(r => r.json())
-                .then(q => {
-                    document.getElementById('edit_question_id').value = q.id;
-                    document.getElementById('edit_serial_no').value = q.serial_no;
-                    document.getElementById('edit_question').value = q.question;
-                    document.getElementById('edit_option1').value = q.option1 || '';
-                    document.getElementById('edit_option2').value = q.option2 || '';
-                    document.getElementById('edit_option3').value = q.option3 || '';
-                    document.getElementById('edit_option4').value = q.option4 || '';
-                    document.getElementById('edit_correct_answer').value = q.correct_answer;
-                    document.getElementById('edit_score').value = q.score;
-                    closeModal('editQuestionsModal');
-                    showModal('editSingleQuestionModal');
-                })
-                .catch(err => alert('Error loading question: ' + err.message));
+            fetch(`/get-question/${questionId}`).then(r => r.json()).then(q => {
+                document.getElementById('edit_question_id').value = q.id;
+                document.getElementById('edit_serial_no').value = q.serial_no;
+                document.getElementById('edit_question').value = q.question;
+                document.getElementById('edit_option1').value = q.option1 || '';
+                document.getElementById('edit_option2').value = q.option2 || '';
+                document.getElementById('edit_option3').value = q.option3 || '';
+                document.getElementById('edit_option4').value = q.option4 || '';
+                document.getElementById('edit_correct_answer').value = q.correct_answer;
+                document.getElementById('edit_score').value = q.score;
+                closeModal('editQuestionsModal');
+                showModal('editSingleQuestionModal');
+            }).catch(err => alert('Error loading question: ' + err.message));
         }
         
         const editQuestionForm = document.getElementById('editQuestionForm');
@@ -1083,17 +1456,13 @@
             if (type === 'class') {
                 classField.style.display = 'block';
                 studentField.style.display = 'none';
-                const classInput = document.querySelector('#class_field input');
-                if (classInput) classInput.required = true;
-                const studentSelect = document.querySelector('#student_field select');
-                if (studentSelect) studentSelect.required = false;
+                if (classField.querySelector('input')) classField.querySelector('input').required = true;
+                if (studentField.querySelector('select')) studentField.querySelector('select').required = false;
             } else {
                 classField.style.display = 'block';
                 studentField.style.display = 'block';
-                const classInput = document.querySelector('#class_field input');
-                if (classInput) classInput.required = true;
-                const studentSelect = document.querySelector('#student_field select');
-                if (studentSelect) studentSelect.required = true;
+                if (classField.querySelector('input')) classField.querySelector('input').required = true;
+                if (studentField.querySelector('select')) studentField.querySelector('select').required = true;
                 loadStudents();
             }
         }
@@ -1136,17 +1505,13 @@
                 const formData = new FormData(this);
                 try {
                     const response = await fetch('{{ url_for("assign_exam") }}', { method: 'POST', body: formData });
-                    if (response.redirected) {
-                        window.location.href = response.url;
+                    const result = await response.json();
+                    if (result.error) {
+                        alert(result.error);
                     } else {
-                        const result = await response.json();
-                        if (result.error) {
-                            alert(result.error);
-                        } else {
-                            alert('Exam assigned successfully!');
-                            closeModal('assignExamModal');
-                            location.reload();
-                        }
+                        showAssignmentSuccessPopup(result.message || 'Exam assigned successfully!');
+                        closeModal('assignExamModal');
+                        setTimeout(() => location.reload(), 2000);
                     }
                 } catch (error) {
                     alert('Error assigning exam: ' + error.message);
@@ -1160,19 +1525,10 @@
             currentResetExamCode = examCode;
             const select = document.getElementById('reset_student_select');
             select.innerHTML = '<option value="">Loading students...</option>';
-            
-            fetch(`/get-students-for-exam/${examCode}`)
-                .then(r => r.json())
-                .then(students => {
-                    select.innerHTML = '<option value="">Select a student</option>';
-                    students.forEach(s => {
-                        select.innerHTML += `<option value="${s.student_id}">${s.student_id} - ${s.name}</option>`;
-                    });
-                })
-                .catch(err => {
-                    select.innerHTML = '<option value="">Error loading students</option>';
-                });
-            
+            fetch(`/get-students-for-exam/${examCode}`).then(r => r.json()).then(students => {
+                select.innerHTML = '<option value="">Select a student</option>';
+                students.forEach(s => { select.innerHTML += `<option value="${s.student_id}">${s.student_id} - ${s.name}</option>`; });
+            }).catch(err => { select.innerHTML = '<option value="">Error loading students</option>'; });
             document.getElementById('reset_exam_code').value = examCode;
             showModal('resetStudentModal');
         }
@@ -1180,24 +1536,14 @@
         async function resetStudentExam() {
             const studentId = document.getElementById('reset_student_select').value;
             const examCode = document.getElementById('reset_exam_code').value;
-            
-            if (!studentId) {
-                alert('Please select a student');
-                return;
-            }
-            
+            if (!studentId) { alert('Please select a student'); return; }
             if (confirm(`Are you sure you want to reset ${studentId}'s exam attempt? This will delete their previous results.`)) {
                 try {
-                    const response = await fetch(`/reset-student-exam/${studentId}/${examCode}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
+                    const response = await fetch(`/reset-student-exam/${studentId}/${examCode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
                     const result = await response.json();
                     alert(result.message || 'Student exam reset successfully!');
                     closeModal('resetStudentModal');
-                } catch (error) {
-                    alert('Error resetting exam: ' + error.message);
-                }
+                } catch (error) { alert('Error resetting exam: ' + error.message); }
             }
         }
         
@@ -1223,30 +1569,17 @@
                     questionsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❓</div><h4>No Questions Found</h4><p>This exam has no questions yet. Upload questions using the CSV option.</p></div>';
                 }
                 showModal('viewQuestionsModal');
-            } catch (error) {
-                alert('Error loading questions');
-            }
+            } catch (error) { alert('Error loading questions'); }
         }
         
         function escapeHtml(text) {
             if (!text) return '';
-            return String(text).replace(/[&<>]/g, function(m) {
-                return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;');
-            });
+            return String(text).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
         }
         
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) event.target.style.display = 'none';
-        };
+        window.onclick = function(event) { if (event.target.classList.contains('modal')) event.target.style.display = 'none'; };
         
-        // Auto-hide alerts after 5 seconds
-        setTimeout(() => {
-            document.querySelectorAll('.alert').forEach(alert => {
-                alert.style.opacity = '0';
-                setTimeout(() => alert.remove(), 300);
-            });
-        }, 5000);
+        setTimeout(() => { document.querySelectorAll('.alert').forEach(alert => { alert.style.opacity = '0'; setTimeout(() => alert.remove(), 300); }); }, 5000);
     </script>
 </body>
 </html>

@@ -3,32 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <title>Student Responses - {{ student.name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background: white; color: #1f2937; line-height: 1.5; }
-        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #0ea5e9; }
-        .school-name { font-size: 28px; font-weight: bold; color: #0ea5e9; margin-bottom: 5px; }
-        .document-title { font-size: 20px; font-weight: 600; margin-top: 10px; color: #374151; }
-        .admin-badge { background: #f59e0b; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; margin-left: 10px; }
-        .student-info { background: #f3f4f6; padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .info-label { font-weight: 600; color: #0ea5e9; }
-        .score-summary { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 30px; }
-        .score-number { font-size: 36px; font-weight: bold; }
-        .section-title { font-size: 20px; font-weight: 600; margin: 25px 0 15px; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; color: #0ea5e9; }
-        .question-block { margin-bottom: 20px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 12px; break-inside: avoid; }
-        .question-block.correct { border-left: 4px solid #10b981; background: #f0fdf4; }
-        .question-block.incorrect { border-left: 4px solid #ef4444; background: #fef2f2; }
-        .question-text { font-weight: 600; font-size: 16px; margin-bottom: 12px; }
-        .student-answer { background: white; padding: 12px; border-radius: 8px; margin: 10px 0; border: 1px solid #e5e7eb; }
-        .correct-answer { background: #f0fdf4; padding: 10px; border-radius: 8px; margin-top: 8px; color: #065f46; }
-        .feedback { margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 8px; font-style: italic; font-size: 13px; }
-        .score-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 8px; background: #10b981; color: white; }
-        .score-wrong { background: #ef4444; }
-        .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #6b7280; padding-top: 20px; border-top: 1px solid #e5e7eb; }
-        .print-date { text-align: right; font-size: 11px; color: #9ca3af; margin-bottom: 20px; }
-        .options { margin: 10px 0; padding-left: 15px; }
-        .option { margin: 5px 0; font-size: 14px; }
-        .selected-option { background: #e0f2fe; padding: 2px 8px; border-radius: 4px; display: inline-block; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 40px; 
+            background: white; 
+            color: #1f2937; 
+            line-height: 1.5;
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            padding-bottom: 20px; 
+            border-bottom: 3px solid #f97316; 
+        }
+        .school-name { 
+            font-size: 28px; 
+            font-weight: bold; 
+            color: #f97316; 
+            margin-bottom: 5px; 
+        }
+        .document-title { 
+            font-size: 20px; 
+            font-weight: 600; 
+            margin-top: 10px; 
+            color: #374151; 
+        }
+        .admin-badge { 
+            background: #f97316; 
+            color: white; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            display: inline-block; 
+            margin-left: 10px; 
+        }
+        .student-info { 
+            background: #fef3c7; 
+            padding: 15px 20px; 
+            border-radius: 12px; 
+            margin-bottom: 25px; 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 10px;
+            border-left: 4px solid #f97316;
+        }
+        .info-label { 
+            font-weight: 600; 
+            color: #f97316; 
+        }
+        .score-summary { 
+            background: linear-gradient(135deg, #f97316, #ea580c); 
+            color: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        .score-number { 
+            font-size: 36px; 
+            font-weight: bold; 
+        }
+        .section-title { 
+            font-size: 20px; 
+            font-weight: 600; 
+            margin: 25px 0 15px; 
+            padding-bottom: 8px; 
+            border-bottom: 2px solid #e5e7eb; 
+            color: #f97316; 
+        }
+        .question-block { 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            border: 1px solid #e5e7eb; 
+            border-radius: 12px; 
+            break-inside: avoid; 
+        }
+        .question-block.correct { 
+            border-left: 4px solid #10b981; 
+            background: #f0fdf4; 
+        }
+        .question-block.incorrect { 
+            border-left: 4px solid #ef4444; 
+            background: #fef2f2; 
+        }
+        .question-text { 
+            font-weight: 600; 
+            font-size: 16px; 
+            margin-bottom: 12px; 
+        }
+        .student-answer { 
+            background: white; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+            border: 1px solid #e5e7eb; 
+        }
+        .correct-answer { 
+            background: #f0fdf4; 
+            padding: 10px; 
+            border-radius: 8px; 
+            margin-top: 8px; 
+            color: #065f46; 
+        }
+        .feedback { 
+            margin-top: 10px; 
+            padding: 10px; 
+            background: #fef3c7; 
+            border-radius: 8px; 
+            font-style: italic; 
+            font-size: 13px; 
+            color: #92400e;
+        }
+        .score-badge { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            margin-left: 10px; 
+            background: #10b981; 
+            color: white; 
+        }
+        .score-wrong { 
+            background: #ef4444; 
+        }
+        .footer { 
+            margin-top: 40px; 
+            text-align: center; 
+            font-size: 12px; 
+            color: #6b7280; 
+            padding-top: 20px; 
+            border-top: 1px solid #e5e7eb; 
+        }
+        .print-date { 
+            text-align: right; 
+            font-size: 11px; 
+            color: #f97316; 
+            margin-bottom: 20px; 
+        }
+        .options { 
+            margin: 10px 0; 
+            padding-left: 15px; 
+        }
+        .option { 
+            margin: 5px 0; 
+            font-size: 14px; 
+        }
+        .selected-option { 
+            background: #fed7aa; 
+            padding: 2px 8px; 
+            border-radius: 4px; 
+            display: inline-block; 
+            color: #7c2d12;
+        }
     </style>
 </head>
 <body>
@@ -38,7 +168,7 @@
     
     <div class="header">
         <div class="school-name"> 
-            GINT Hive CBT <span class="admin-badge">ADMIN REPORT</span>
+            🍯 GINT Hive CBT <span class="admin-badge">ADMIN REPORT</span>
         </div>
         <div class="document-title">
             Student Exam Responses
@@ -48,18 +178,45 @@
         </div>
     </div>
 
-    <div class="student-info"><p><span class="info-label">Student Name:</span> {{ student.name }}</p><p><span class="info-label">Student ID:</span> {{ student.student_id }}</p><p><span class="info-label">Class:</span> {{ student.class_id }}</p><p><span class="info-label">Session:</span> {{ student.session }}</p></div>
-    <div class="score-summary"><div class="score-number">{{ total_score }} / {{ total_possible }}</div><div class="score-percentage">{{ percentage }}%</div></div>
+    <div class="student-info">
+        <p><span class="info-label">Student Name:</span> {{ student.name }}</p>
+        <p><span class="info-label">Student ID:</span> {{ student.student_id }}</p>
+        <p><span class="info-label">Class:</span> {{ student.class_id }}</p>
+        <p><span class="info-label">Session:</span> {{ student.session }}</p>
+    </div>
+    
+    <div class="score-summary">
+        <div class="score-number">{{ total_score }} / {{ total_possible }}</div>
+        <div class="score-percentage">{{ percentage }}%</div>
+    </div>
     
     {% if objective_questions %}
     <div class="section-title">📋 Objective Questions</div>
     {% for q in objective_questions %}
-    {% set is_correct = q.student_score == q.score %}
-    <div class="question-block {% if is_correct %}correct{% else %}incorrect{% endif %}">
-        <div class="question-text">Q{{ q.serial_no }}. {{ q.question }} <span class="score-badge {% if not is_correct %}score-wrong{% endif %}">{{ q.student_score|default(0) }}/{{ q.score }} marks</span></div>
-        <div class="options"><div class="option">A. {{ q.option1 }}</div><div class="option">B. {{ q.option2 }}</div><div class="option">C. {{ q.option3 }}</div><div class="option">D. {{ q.option4 }}</div></div>
-        <div class="student-answer"><strong>Student's Answer:</strong> {% if q.student_answer and q.student_answer != 'Not answered' %}<span class="selected-option">{{ q.student_answer }}</span>{% else %}<span style="color:#ef4444;">Not answered</span>{% endif %}</div>
-        {% if not is_correct %}<div class="correct-answer"><strong>✓ Correct Answer:</strong> {{ q.correct_answer }}</div>{% endif %}
+    <div class="question-block {% if q.is_correct %}correct{% else %}incorrect{% endif %}">
+        <div class="question-text">
+            Q{{ q.serial_no }}. {{ q.question }} 
+            <span class="score-badge {% if not q.is_correct %}score-wrong{% endif %}">
+                {{ q.student_score }}/{{ q.score }} marks
+            </span>
+        </div>
+        <div class="options">
+            <div class="option">A. {{ q.option1 }}</div>
+            <div class="option">B. {{ q.option2 }}</div>
+            <div class="option">C. {{ q.option3 }}</div>
+            <div class="option">D. {{ q.option4 }}</div>
+        </div>
+        <div class="student-answer">
+            <strong>Student's Answer:</strong> 
+            {% if q.student_answer and q.student_answer != 'Not answered' %}
+                <span class="selected-option">{{ q.student_answer }}</span>
+            {% else %}
+                <span style="color:#ef4444;">Not answered</span>
+            {% endif %}
+        </div>
+        {% if not q.is_correct %}
+        <div class="correct-answer"><strong>✓ Correct Answer:</strong> {{ q.correct_answer }}</div>
+        {% endif %}
     </div>
     {% endfor %}
     {% endif %}
@@ -67,16 +224,30 @@
     {% if theory_answers %}
     <div class="section-title">✍️ Theory Questions</div>
     {% for ta in theory_answers %}
-    {% set is_good = ta.score >= (ta.max_score|default(10) * 0.6) %}
+    {% set is_good = ta.score >= (ta.max_score * 0.6) %}
     <div class="question-block {% if is_good %}correct{% else %}incorrect{% endif %}">
-        <div class="question-text">Q{{ ta.serial_no }}. {{ ta.question }} <span class="score-badge {% if not is_good %}score-wrong{% endif %}">{{ ta.score|default(0) }}/{{ ta.max_score|default(10) }} marks</span></div>
-        <div class="student-answer"><strong>Student's Answer:</strong><br>{{ ta.answer|default('Not answered')|nl2br }}</div>
-        <div class="correct-answer"><strong>📚 Model Answer:</strong><br>{{ ta.correct_answer }}</div>
-        <div class="feedback"><strong>💡 Feedback Given:</strong> {{ ta.feedback|default('No feedback provided.') }}</div>
+        <div class="question-text">
+            Q{{ ta.serial_no }}. {{ ta.question }} 
+            <span class="score-badge {% if not is_good %}score-wrong{% endif %}">
+                {{ ta.score }}/{{ ta.max_score }} marks
+            </span>
+        </div>
+        <div class="student-answer">
+            <strong>Student's Answer:</strong><br>{{ ta.answer|default('Not answered')|nl2br }}
+        </div>
+        <div class="correct-answer">
+            <strong>📚 Model Answer:</strong><br>{{ ta.correct_answer }}
+        </div>
+        <div class="feedback">
+            <strong>💡 Feedback Given:</strong> {{ ta.feedback|default('No feedback provided.') }}
+        </div>
     </div>
     {% endfor %}
     {% endif %}
     
-    <div class="footer"><p>This is an official administrative record of student exam responses.</p><p>GINT Hive CBT - Proctored Examination System</p></div>
+    <div class="footer">
+        <p>🍯 This is an official administrative record of student exam responses.</p>
+        <p>GINT Hive CBT - Proctored Examination System</p>
+    </div>
 </body>
 </html>
